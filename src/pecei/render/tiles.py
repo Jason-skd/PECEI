@@ -11,6 +11,7 @@ TILE = 48  # default pixels per cell
 
 BG = (24, 26, 32)
 GRID_LINE = (44, 48, 58)
+GOAL = (96, 220, 120)
 EGO_OUTLINE = (245, 245, 245)
 OTHER_OUTLINE = (130, 134, 146)
 LABEL_FG = (245, 245, 245)

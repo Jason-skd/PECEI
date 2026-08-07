@@ -47,6 +47,7 @@ class EntitySpec(BaseModel):
 class MapSpec(BaseModel):
     width: int
     height: int
+    goal: tuple[int, int] | None = None
     entities: list[EntitySpec]
 
     def build_grid(self) -> Grid:
@@ -58,6 +59,16 @@ class MapSpec(BaseModel):
     def build_entities(self) -> list[Entity]:
         """Build the placed Entity objects (read-only views; not registered in any Grid)."""
         return [spec.build() for spec in self.entities]
+
+    def build_world(self) -> "World":
+        """Build a World (canonical mutable state) with all entities placed."""
+        from .world import World
+
+        world = World.empty(self.width, self.height,
+                            goal=tuple(self.goal) if self.goal else None)
+        for spec in self.entities:
+            world.add(spec.build())
+        return world
 
 
 def parse_map(data: dict[str, Any]) -> Grid:
@@ -80,3 +91,8 @@ def load_map_spec(path: str | Path) -> MapSpec:
 def load_map(path: str | Path) -> Grid:
     """Read a JSON or YAML map file and build its Grid."""
     return load_map_spec(path).build_grid()
+
+
+def load_world(path: str | Path) -> "World":
+    """Read a JSON or YAML map file and build a World (mutable game state)."""
+    return load_map_spec(path).build_world()

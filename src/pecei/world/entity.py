@@ -57,6 +57,10 @@ class Entity:
     anchor: tuple[int, int] | None = None
     orientation: Direction = Direction.NORTH
     is_ego: bool = False
+    # FOV overrides (None => use observation-layer defaults). Reserved so scene
+    # facilities can later reshape an actor's perception (see design notes).
+    vision_range: int | None = None
+    half_angle: float | None = None
 
     def footprint(self) -> set[tuple[int, int]]:
         """Local offsets occupied by this entity."""

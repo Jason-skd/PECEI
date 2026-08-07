@@ -26,7 +26,12 @@ class Renderer:
         pygame.init()
         self.tile = tile
 
-    def render(self, grid: Grid, entities: list[Entity] | None = None) -> pygame.Surface:
+    def render(
+        self,
+        grid: Grid,
+        entities: list[Entity] | None = None,
+        goal: tuple[int, int] | None = None,
+    ) -> pygame.Surface:
         w, h = grid.width * self.tile, grid.height * self.tile
         surf = pygame.Surface((w, h), pygame.SRCALPHA)
         surf.fill(tiles.BG)
@@ -55,6 +60,14 @@ class Renderer:
             pygame.draw.line(surf, tiles.GRID_LINE, (x * self.tile, 0), (x * self.tile, h))
         for y in range(grid.height + 1):
             pygame.draw.line(surf, tiles.GRID_LINE, (0, y * self.tile), (w, y * self.tile))
+
+        # goal marker (green ring)
+        if goal is not None:
+            gx, gy = goal
+            if grid.in_bounds(gx, gy):
+                cx = gx * self.tile + self.tile // 2
+                cy = gy * self.tile + self.tile // 2
+                pygame.draw.circle(surf, tiles.GOAL, (cx, cy), self.tile // 2 - 3, 3)
 
         return surf
 

@@ -1,0 +1,19 @@
+# Level with a goal + a wall. ego (facing EAST) reaches the goal by going
+# straight east 3 cells. ASCII glyphs: stone=# wheel=o metal=m brain=@
+# Goal cell [6,2] renders as a green ring.
+width: 7
+height: 5
+goal: [6, 2]
+entities:
+  - name: ego
+    anchor: [3, 2]
+    orientation: EAST
+    is_ego: true
+    components:
+      - { offset: [0, 0], type: wheel }
+      - { offset: [0, 1], type: metal }
+      - { offset: [0, 2], type: brain }
+  - name: wall
+    anchor: [5, 1]
+    components:
+      - { offset: [0, 0], type: stone }

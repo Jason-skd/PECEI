@@ -1,22 +1,22 @@
 """pygame shell: display a (static) world in a window.
 
-This is the M2 verification surface — open a map and eyeball that it renders
-into a sensible world. live/replay modes (M7) will extend this shell.
+M2/M3 verification surface — open a level and eyeball that it renders into a
+sensible world (entities, outlines, facing, goal). live/replay (M7) will extend
+this shell.
 """
 from __future__ import annotations
 
 import pygame
 
-from pecei.world.entity import Entity
-from pecei.world.grid import Grid
+from pecei.world.world import World
 
 from .renderer import Renderer
 
 
-def show(grid: Grid, entities: list[Entity] | None = None, title: str = "PECEI") -> None:
-    """Open a window showing ``grid``. Close with ESC, Q, or the window button."""
+def show(world: World, title: str = "PECEI") -> None:
+    """Open a window showing ``world``. Close with ESC, Q, or the window button."""
     renderer = Renderer()
-    frame = renderer.render(grid, entities)
+    frame = renderer.render(world.grid, list(world.entities.values()), world.goal)
     w, h = frame.get_size()
     pygame.display.init()
     screen = pygame.display.set_mode((w, h))

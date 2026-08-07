@@ -74,6 +74,19 @@ class Grid:
             self._check(x, y)
             self._cells[y][x].append(Occupant(entity.eid, local, comp))
 
+    def remove(self, eid: str) -> None:
+        """Remove all occupants of entity ``eid`` from every cell."""
+        for y in range(self.height):
+            for cell in self._cells[y]:
+                if any(o.eid == eid for o in cell):
+                    cell[:] = [o for o in cell if o.eid != eid]
+
+    def cells(self):
+        """Yield ``(x, y, occupants)`` for every cell (occupants is the live list)."""
+        for y in range(self.height):
+            for x in range(self.width):
+                yield x, y, self._cells[y][x]
+
     def ascii(self) -> str:
         """Debug dump: one glyph per cell (top occupant wins; '.' = empty)."""
         rows: list[str] = []
