@@ -1,0 +1,25 @@
+# Example map for M1 verification. Everything occupying a cell is an Entity.
+# ASCII dump glyphs: stone=# wood=w fire=* water=~ wheel=o brain=@ metal=m
+width: 6
+height: 5
+entities:
+  # ego: 3-cell robot (wheel/metal/brain), facing NORTH from anchor (1,1)
+  - name: ego
+    anchor: [1, 1]
+    orientation: NORTH
+    is_ego: true
+    components:
+      - { offset: [0, 0], type: wheel }
+      - { offset: [0, 1], type: metal }
+      - { offset: [0, 2], type: brain }
+  # a 2-cell river
+  - name: river
+    anchor: [3, 1]
+    components:
+      - { offset: [0, 0], type: water }
+      - { offset: [0, 1], type: water }
+  # a fire cell
+  - name: fire1
+    anchor: [4, 3]
+    components:
+      - { offset: [0, 0], type: fire }
