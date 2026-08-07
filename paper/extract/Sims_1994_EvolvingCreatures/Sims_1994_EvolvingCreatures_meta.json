@@ -1,0 +1,925 @@
+{
+  "table_of_contents": [
+    {
+      "title": "Evolving Virtual Creatures",
+      "heading_level": null,
+      "page_id": 0,
+      "polygon": [
+        [
+          189.45703125,
+          73.46539306640625
+        ],
+        [
+          421.9300231933594,
+          73.46539306640625
+        ],
+        [
+          421.9300231933594,
+          93.46539306640625
+        ],
+        [
+          189.45703125,
+          93.46539306640625
+        ]
+      ]
+    },
+    {
+      "title": "Karl Sims",
+      "heading_level": null,
+      "page_id": 0,
+      "polygon": [
+        [
+          280.1600036621094,
+          110.32122802734375
+        ],
+        [
+          331.8320007324219,
+          110.32122802734375
+        ],
+        [
+          331.8320007324219,
+          122.32122802734375
+        ],
+        [
+          280.1600036621094,
+          122.32122802734375
+        ]
+      ]
+    },
+    {
+      "title": "Abstract",
+      "heading_level": null,
+      "page_id": 0,
+      "polygon": [
+        [
+          53.7890625,
+          178.27734375
+        ],
+        [
+          98.6520004272461,
+          178.27734375
+        ],
+        [
+          98.6520004272461,
+          190.72125244140625
+        ],
+        [
+          53.7890625,
+          190.72125244140625
+        ]
+      ]
+    },
+    {
+      "title": "1 Introduction",
+      "heading_level": null,
+      "page_id": 0,
+      "polygon": [
+        [
+          54.0,
+          368.6312561035156
+        ],
+        [
+          131.12400817871094,
+          368.6312561035156
+        ],
+        [
+          131.12400817871094,
+          380.6312561035156
+        ],
+        [
+          54.0,
+          380.6312561035156
+        ]
+      ]
+    },
+    {
+      "title": "2 Creature Morphology",
+      "heading_level": null,
+      "page_id": 1,
+      "polygon": [
+        [
+          53.7890625,
+          279.001220703125
+        ],
+        [
+          178.5360107421875,
+          279.001220703125
+        ],
+        [
+          178.5360107421875,
+          291.0012512207031
+        ],
+        [
+          53.7890625,
+          291.0012512207031
+        ]
+      ]
+    },
+    {
+      "title": "3 Creature Control",
+      "heading_level": null,
+      "page_id": 1,
+      "polygon": [
+        [
+          317.35546875,
+          450.52734375
+        ],
+        [
+          418.95703125,
+          450.52734375
+        ],
+        [
+          418.95703125,
+          463.521240234375
+        ],
+        [
+          317.35546875,
+          463.521240234375
+        ]
+      ]
+    },
+    {
+      "title": "3.1 Sensors",
+      "heading_level": null,
+      "page_id": 2,
+      "polygon": [
+        [
+          53.7890625,
+          52.59375
+        ],
+        [
+          109.30799865722656,
+          52.59375
+        ],
+        [
+          109.30799865722656,
+          63.824462890625
+        ],
+        [
+          53.7890625,
+          63.824462890625
+        ]
+      ]
+    },
+    {
+      "title": "3.2 Neurons",
+      "heading_level": null,
+      "page_id": 2,
+      "polygon": [
+        [
+          54.0,
+          361.1953125
+        ],
+        [
+          112.77300262451172,
+          361.1953125
+        ],
+        [
+          112.77300262451172,
+          372.53448486328125
+        ],
+        [
+          54.0,
+          372.53448486328125
+        ]
+      ]
+    },
+    {
+      "title": "3.3 Effectors",
+      "heading_level": null,
+      "page_id": 2,
+      "polygon": [
+        [
+          53.490234375,
+          679.46484375
+        ],
+        [
+          116.00699615478516,
+          679.46484375
+        ],
+        [
+          116.00699615478516,
+          692.1344680786133
+        ],
+        [
+          53.490234375,
+          692.1344680786133
+        ]
+      ]
+    },
+    {
+      "title": "3.4 Combining Morphology and Control",
+      "heading_level": null,
+      "page_id": 2,
+      "polygon": [
+        [
+          317.35546875,
+          214.62890625
+        ],
+        [
+          510.2039794921875,
+          214.62890625
+        ],
+        [
+          510.2039794921875,
+          226.0244140625
+        ],
+        [
+          317.35546875,
+          226.0244140625
+        ]
+      ]
+    },
+    {
+      "title": "4 Physical Simulation",
+      "heading_level": null,
+      "page_id": 3,
+      "polygon": [
+        [
+          315.263671875,
+          214.20123291015625
+        ],
+        [
+          431.5679626464844,
+          214.20123291015625
+        ],
+        [
+          431.5679626464844,
+          226.20123291015625
+        ],
+        [
+          315.263671875,
+          226.20123291015625
+        ]
+      ]
+    },
+    {
+      "title": "5 Behavior Selection",
+      "heading_level": null,
+      "page_id": 4,
+      "polygon": [
+        [
+          54.0,
+          52.72125244140625
+        ],
+        [
+          161.66400146484375,
+          52.72125244140625
+        ],
+        [
+          161.66400146484375,
+          64.72125244140625
+        ],
+        [
+          54.0,
+          64.72125244140625
+        ]
+      ]
+    },
+    {
+      "title": "5.1 Swimming",
+      "heading_level": null,
+      "page_id": 4,
+      "polygon": [
+        [
+          53.7890625,
+          386.33203125
+        ],
+        [
+          123.36599731445312,
+          386.33203125
+        ],
+        [
+          123.36599731445312,
+          397.6344909667969
+        ],
+        [
+          53.7890625,
+          397.6344909667969
+        ]
+      ]
+    },
+    {
+      "title": "5.2 Walking",
+      "heading_level": null,
+      "page_id": 4,
+      "polygon": [
+        [
+          52.892578125,
+          511.9744873046875
+        ],
+        [
+          112.98199462890625,
+          511.9744873046875
+        ],
+        [
+          112.98199462890625,
+          522.9744873046875
+        ],
+        [
+          52.892578125,
+          522.9744873046875
+        ]
+      ]
+    },
+    {
+      "title": "5.3 Jumping",
+      "heading_level": null,
+      "page_id": 4,
+      "polygon": [
+        [
+          53.490234375,
+          669.9944686889648
+        ],
+        [
+          115.048828125,
+          669.9944686889648
+        ],
+        [
+          115.048828125,
+          680.9944686889648
+        ],
+        [
+          53.490234375,
+          680.9944686889648
+        ]
+      ]
+    },
+    {
+      "title": "5.4 Following",
+      "heading_level": null,
+      "page_id": 4,
+      "polygon": [
+        [
+          315.861328125,
+          52.59375
+        ],
+        [
+          383.5829772949219,
+          52.59375
+        ],
+        [
+          383.5829772949219,
+          63.824462890625
+        ],
+        [
+          315.861328125,
+          63.824462890625
+        ]
+      ]
+    },
+    {
+      "title": "6 Creature Evolution",
+      "heading_level": null,
+      "page_id": 4,
+      "polygon": [
+        [
+          317.8799743652344,
+          230.3912353515625
+        ],
+        [
+          429.0959777832031,
+          230.3912353515625
+        ],
+        [
+          429.0959777832031,
+          242.3912353515625
+        ],
+        [
+          317.8799743652344,
+          242.3912353515625
+        ]
+      ]
+    },
+    {
+      "title": "6.1 Mutating Directed Graphs",
+      "heading_level": null,
+      "page_id": 4,
+      "polygon": [
+        [
+          317.8799743652344,
+          572.7544860839844
+        ],
+        [
+          462.199951171875,
+          572.7544860839844
+        ],
+        [
+          462.199951171875,
+          583.7544860839844
+        ],
+        [
+          317.8799743652344,
+          583.7544860839844
+        ]
+      ]
+    },
+    {
+      "title": "6.2 Mating Directed Graphs",
+      "heading_level": null,
+      "page_id": 5,
+      "polygon": [
+        [
+          52.892578125,
+          486.1944885253906
+        ],
+        [
+          188.560546875,
+          486.1944885253906
+        ],
+        [
+          188.560546875,
+          497.1944885253906
+        ],
+        [
+          52.892578125,
+          497.1944885253906
+        ]
+      ]
+    },
+    {
+      "title": "a. Crossovers: b. Grafting:\nparent 1\nparent 2\nparent 1 parent 2",
+      "heading_level": null,
+      "page_id": 5,
+      "polygon": [
+        [
+          312.57421875,
+          51.8203125
+        ],
+        [
+          548.05078125,
+          51.8203125
+        ],
+        [
+          548.05078125,
+          133.8046875
+        ],
+        [
+          312.57421875,
+          133.8046875
+        ]
+      ]
+    },
+    {
+      "title": "6.3 Parallel Implementation",
+      "heading_level": null,
+      "page_id": 5,
+      "polygon": [
+        [
+          317.8799743652344,
+          335.28515625
+        ],
+        [
+          451.828125,
+          335.28515625
+        ],
+        [
+          451.828125,
+          346.7244567871094
+        ],
+        [
+          317.8799743652344,
+          346.7244567871094
+        ]
+      ]
+    },
+    {
+      "title": "7 Results",
+      "heading_level": null,
+      "page_id": 5,
+      "polygon": [
+        [
+          317.056640625,
+          592.0112457275391
+        ],
+        [
+          367.21197509765625,
+          592.0112457275391
+        ],
+        [
+          367.21197509765625,
+          604.0112457275391
+        ],
+        [
+          317.056640625,
+          604.0112457275391
+        ]
+      ]
+    },
+    {
+      "title": "8 Future Work",
+      "heading_level": null,
+      "page_id": 7,
+      "polygon": [
+        [
+          53.490234375,
+          52.72125244140625
+        ],
+        [
+          133.45201110839844,
+          52.72125244140625
+        ],
+        [
+          133.45201110839844,
+          64.72125244140625
+        ],
+        [
+          53.490234375,
+          64.72125244140625
+        ]
+      ]
+    },
+    {
+      "title": "9 Conclusion",
+      "heading_level": null,
+      "page_id": 7,
+      "polygon": [
+        [
+          53.7890625,
+          403.8912658691406
+        ],
+        [
+          123.34799194335938,
+          403.8912658691406
+        ],
+        [
+          123.34799194335938,
+          415.8912658691406
+        ],
+        [
+          53.7890625,
+          415.8912658691406
+        ]
+      ]
+    },
+    {
+      "title": "Acknowledgments",
+      "heading_level": null,
+      "page_id": 7,
+      "polygon": [
+        [
+          52.892578125,
+          659.7112426757812
+        ],
+        [
+          147.99600219726562,
+          659.7112426757812
+        ],
+        [
+          147.99600219726562,
+          671.7112350463867
+        ],
+        [
+          52.892578125,
+          671.7112350463867
+        ]
+      ]
+    },
+    {
+      "title": "References",
+      "heading_level": null,
+      "page_id": 7,
+      "polygon": [
+        [
+          317.8799743652344,
+          52.72125244140625
+        ],
+        [
+          374.431640625,
+          52.72125244140625
+        ],
+        [
+          374.431640625,
+          64.72125244140625
+        ],
+        [
+          317.8799743652344,
+          64.72125244140625
+        ]
+      ]
+    }
+  ],
+  "page_stats": [
+    {
+      "page_id": 0,
+      "text_extraction_method": "pdftext",
+      "block_counts": [
+        [
+          "Span",
+          206
+        ],
+        [
+          "Line",
+          106
+        ],
+        [
+          "Text",
+          13
+        ],
+        [
+          "SectionHeader",
+          4
+        ]
+      ],
+      "block_metadata": {
+        "llm_request_count": 0,
+        "llm_error_count": 0,
+        "llm_tokens_used": 0,
+        "previous_text": "",
+        "previous_type": "",
+        "previous_order": 0
+      }
+    },
+    {
+      "page_id": 1,
+      "text_extraction_method": "pdftext",
+      "block_counts": [
+        [
+          "Span",
+          222
+        ],
+        [
+          "Line",
+          94
+        ],
+        [
+          "Text",
+          11
+        ],
+        [
+          "SectionHeader",
+          2
+        ],
+        [
+          "Figure",
+          2
+        ],
+        [
+          "Caption",
+          2
+        ],
+        [
+          "FigureGroup",
+          2
+        ]
+      ],
+      "block_metadata": {
+        "llm_request_count": 0,
+        "llm_error_count": 0,
+        "llm_tokens_used": 0,
+        "previous_text": "",
+        "previous_type": "",
+        "previous_order": 0
+      }
+    },
+    {
+      "page_id": 2,
+      "text_extraction_method": "pdftext",
+      "block_counts": [
+        [
+          "Span",
+          224
+        ],
+        [
+          "Line",
+          114
+        ],
+        [
+          "Text",
+          15
+        ],
+        [
+          "SectionHeader",
+          4
+        ],
+        [
+          "ListItem",
+          3
+        ],
+        [
+          "Figure",
+          1
+        ],
+        [
+          "Caption",
+          1
+        ],
+        [
+          "FigureGroup",
+          1
+        ],
+        [
+          "ListGroup",
+          1
+        ]
+      ],
+      "block_metadata": {
+        "llm_request_count": 0,
+        "llm_error_count": 0,
+        "llm_tokens_used": 0,
+        "previous_text": "",
+        "previous_type": "",
+        "previous_order": 0
+      }
+    },
+    {
+      "page_id": 3,
+      "text_extraction_method": "pdftext",
+      "block_counts": [
+        [
+          "Span",
+          208
+        ],
+        [
+          "Line",
+          110
+        ],
+        [
+          "Text",
+          9
+        ],
+        [
+          "Caption",
+          2
+        ],
+        [
+          "Picture",
+          1
+        ],
+        [
+          "Figure",
+          1
+        ],
+        [
+          "SectionHeader",
+          1
+        ],
+        [
+          "PictureGroup",
+          1
+        ],
+        [
+          "FigureGroup",
+          1
+        ]
+      ],
+      "block_metadata": {
+        "llm_request_count": 0,
+        "llm_error_count": 0,
+        "llm_tokens_used": 0,
+        "previous_text": "",
+        "previous_type": "",
+        "previous_order": 0
+      }
+    },
+    {
+      "page_id": 4,
+      "text_extraction_method": "pdftext",
+      "block_counts": [
+        [
+          "Span",
+          224
+        ],
+        [
+          "Line",
+          116
+        ],
+        [
+          "Text",
+          17
+        ],
+        [
+          "SectionHeader",
+          7
+        ]
+      ],
+      "block_metadata": {
+        "llm_request_count": 0,
+        "llm_error_count": 0,
+        "llm_tokens_used": 0,
+        "previous_text": "",
+        "previous_type": "",
+        "previous_order": 0
+      }
+    },
+    {
+      "page_id": 5,
+      "text_extraction_method": "pdftext",
+      "block_counts": [
+        [
+          "Span",
+          223
+        ],
+        [
+          "Line",
+          114
+        ],
+        [
+          "Text",
+          15
+        ],
+        [
+          "ListItem",
+          4
+        ],
+        [
+          "SectionHeader",
+          4
+        ],
+        [
+          "Caption",
+          1
+        ],
+        [
+          "ListGroup",
+          1
+        ]
+      ],
+      "block_metadata": {
+        "llm_request_count": 0,
+        "llm_error_count": 0,
+        "llm_tokens_used": 0,
+        "previous_text": "",
+        "previous_type": "",
+        "previous_order": 0
+      }
+    },
+    {
+      "page_id": 6,
+      "text_extraction_method": "pdftext",
+      "block_counts": [
+        [
+          "Span",
+          104
+        ],
+        [
+          "Line",
+          53
+        ],
+        [
+          "Text",
+          8
+        ],
+        [
+          "Picture",
+          4
+        ],
+        [
+          "Caption",
+          4
+        ],
+        [
+          "PictureGroup",
+          4
+        ]
+      ],
+      "block_metadata": {
+        "llm_request_count": 0,
+        "llm_error_count": 0,
+        "llm_tokens_used": 0,
+        "previous_text": "",
+        "previous_type": "",
+        "previous_order": 0
+      }
+    },
+    {
+      "page_id": 7,
+      "text_extraction_method": "pdftext",
+      "block_counts": [
+        [
+          "Span",
+          280
+        ],
+        [
+          "Line",
+          121
+        ],
+        [
+          "ListItem",
+          22
+        ],
+        [
+          "Text",
+          7
+        ],
+        [
+          "SectionHeader",
+          4
+        ],
+        [
+          "ListGroup",
+          1
+        ]
+      ],
+      "block_metadata": {
+        "llm_request_count": 0,
+        "llm_error_count": 0,
+        "llm_tokens_used": 0,
+        "previous_text": "",
+        "previous_type": "",
+        "previous_order": 0
+      }
+    }
+  ],
+  "debug_data_path": "debug_data/Sims_1994_EvolvingCreatures"
+}
