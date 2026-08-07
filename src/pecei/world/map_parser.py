@@ -55,14 +55,18 @@ class MapSpec(BaseModel):
             grid.place(spec.build())
         return grid
 
+    def build_entities(self) -> list[Entity]:
+        """Build the placed Entity objects (read-only views; not registered in any Grid)."""
+        return [spec.build() for spec in self.entities]
+
 
 def parse_map(data: dict[str, Any]) -> Grid:
     """Validate a parsed map dict and build its Grid."""
     return MapSpec.model_validate(data).build_grid()
 
 
-def load_map(path: str | Path) -> Grid:
-    """Read a JSON or YAML map file and build its Grid."""
+def load_map_spec(path: str | Path) -> MapSpec:
+    """Read a JSON or YAML map file and return the validated MapSpec."""
     p = Path(path)
     text = p.read_text(encoding="utf-8")
     if p.suffix.lower() == ".json":
@@ -70,4 +74,9 @@ def load_map(path: str | Path) -> Grid:
     else:
         # YAML is a JSON superset; accept .yaml/.yml and fall back to YAML.
         data = yaml.safe_load(text)
-    return parse_map(data)
+    return MapSpec.model_validate(data)
+
+
+def load_map(path: str | Path) -> Grid:
+    """Read a JSON or YAML map file and build its Grid."""
+    return load_map_spec(path).build_grid()
