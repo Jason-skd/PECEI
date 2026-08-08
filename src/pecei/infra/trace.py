@@ -21,6 +21,7 @@ class TraceEvent(BaseModel):
     anchor_after: tuple[int, int] | None = None
     orientation_after: str | None = None
     observation: dict | None = None               # serialized Observation
+    program: str | None = None                    # pretty(program) for the cycle owning this round
     llm_request: dict | None = None               # reserved (M6): raw LLM request
     llm_response: dict | None = None              # reserved (M6): raw LLM response
     yielded: list[dict] = Field(default_factory=list)  # serialized obs yielded this round
