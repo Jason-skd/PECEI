@@ -226,3 +226,14 @@ pyrightconfig.json
 .ionide
 
 # End of https://www.toptal.com/developers/gitignore/api/macos,visualstudiocode,python
+
+### PECEI ###
+# generated episode traces + exported frames (regenerable)
+*.trace.jsonl
+*.trace.png
+
+# env (api keys + endpoints) — never commit (.env also covered by the Python template above)
+.env
+
+# interactive epoch sessions (regenerable)
+sessions/
