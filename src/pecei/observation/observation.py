@@ -25,6 +25,9 @@ class CellView:
     ctypes: tuple[ComponentType, ...]
     eids: tuple[str, ...]
 
+    def to_dict(self) -> dict:
+        return {"types": [t.value for t in self.ctypes], "eids": list(self.eids)}
+
 
 @dataclass(frozen=True)
 class Observation:
@@ -38,6 +41,15 @@ class Observation:
     def at(self, dx: int, dy: int) -> CellView | None:
         """Perceived cell at relative offset (dx, dy), or None if unseen."""
         return self.cells.get((dx, dy))
+
+    def to_dict(self) -> dict:
+        return {
+            "anchor": list(self.anchor),
+            "orientation": self.orientation.value,
+            "vision_range": self.vision_range,
+            "half_angle": self.half_angle,
+            "cells": {f"{dx},{dy}": cv.to_dict() for (dx, dy), cv in self.cells.items()},
+        }
 
 
 def observe(

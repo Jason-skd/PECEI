@@ -95,3 +95,16 @@ class Entity:
             if comp.ctype is ComponentType.BRAIN:
                 return off
         return None
+
+    def to_dict(self) -> dict:
+        """Serializable view of this entity's structure + placement (for traces/reports)."""
+        return {
+            "eid": self.eid,
+            "anchor": list(self.anchor) if self.anchor else None,
+            "orientation": self.orientation.value,
+            "is_ego": self.is_ego,
+            "components": [
+                {"offset": list(off), "type": c.ctype.value, "attrs": dict(c.attrs)}
+                for off, c in self.components.items()
+            ],
+        }

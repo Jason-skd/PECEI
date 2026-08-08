@@ -6,6 +6,7 @@ will map ``act`` onto :meth:`RoundEngine.apply`.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Callable
 
 from pecei.world.actions import ActionResult, ActionType, apply_action
 from pecei.world.world import World
@@ -16,6 +17,8 @@ class RoundEngine:
     world: World
     round_budget: int = 100
     round: int = 0
+    # optional per-round hook (round, eid, action, result) for tracing/preview
+    on_round: Callable[[int, str, ActionType, ActionResult], None] | None = None
 
     def apply(self, eid: str, action: ActionType) -> ActionResult:
         """Apply one action = one round (action resolves, then environment ticks)."""
@@ -24,6 +27,8 @@ class RoundEngine:
         res = apply_action(self.world, eid, action)
         self.world.tick_environment()
         self.round += 1
+        if self.on_round is not None:
+            self.on_round(self.round, eid, action, res)
         return res
 
     @property

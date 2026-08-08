@@ -82,3 +82,8 @@ class NavObs:
     back = property(lambda self: self._cell("back"))
     left = property(lambda self: self._cell("left"))
     here = property(lambda self: self._cell("here"))
+
+    @property
+    def observation(self) -> Observation:
+        """The underlying Observation (for serialization in traces/reports)."""
+        return self._obs
