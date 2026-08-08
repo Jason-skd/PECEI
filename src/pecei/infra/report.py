@@ -1,7 +1,7 @@
 """Match report: the fixed outcome + optional failure snapshot + yielded views.
 
 Per the design:
-    result: SUCCESS | TIME_LIMIT_EXCEED | ENERGY_RUN_OUT  (ENERGY deferred)
+    result: SUCCESS | ROUND_LIMIT_EXCEED | ENERGY_RUN_OUT | SCRIPT_ENDED  (ENERGY deferred)
     failure_snapshot (nullable): pos, current_state (ego entity graph), complexity
     yielded: list of observation snapshots the actor chose to report
 """
@@ -18,8 +18,9 @@ from .complexity import complexity
 
 class Result(str, Enum):
     SUCCESS = "SUCCESS"
-    TIME_LIMIT_EXCEED = "TIME_LIMIT_EXCEED"
+    ROUND_LIMIT_EXCEED = "ROUND_LIMIT_EXCEED"
     ENERGY_RUN_OUT = "ENERGY_RUN_OUT"  # reserved (energy budget deferred)
+    SCRIPT_ENDED = "SCRIPT_ENDED"      # script body exhausted w/o reaching goal
 
 
 class FailureSnapshot(BaseModel):
