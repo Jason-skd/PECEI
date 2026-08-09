@@ -1,7 +1,7 @@
 """Script-runner tests: one decide() per cycle + stop-reason mapping + feedback."""
 from pathlib import Path
 
-from pecei.action import Act, Assign, ExprStmt, If, Observe, Program
+from pecei.action import Act, Assign, Beat, BeatOp, ExprStmt, If, Program
 from pecei.infra import Result
 from pecei.llm import MockProvider
 from pecei.llm.protocol import TurnInput, TurnOutput
@@ -54,7 +54,7 @@ def test_round_limit_exceed_on_tiny_budget():
 
 
 def test_script_ended_when_body_has_no_acts():
-    inert = MockProvider(program=Program(body=[Assign(name="ob", expr=Observe())]))
+    inert = MockProvider(program=Program(body=[Assign(name="ob", expr=Beat(op=BeatOp.OBSERVE))]))
     r = run_script(str(EXAMPLE02), inert, round_budget=50)
     assert r.stop_reason is Result.SCRIPT_ENDED
     assert r.rounds == 0

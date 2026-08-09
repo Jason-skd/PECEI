@@ -10,6 +10,7 @@ the named variable is bool-typed.
 """
 from __future__ import annotations
 
+from enum import Enum
 from typing import Annotated, Any, Literal, Union
 
 from pydantic import BaseModel, Field
@@ -54,21 +55,29 @@ class Act(BaseModel):
     args: dict[str, Any] | None = None  # reserved (e.g. forward*2 later)
 
 
-class Observe(BaseModel):
-    kind: Literal["observe"] = "observe"
+class BeatOp(str, Enum):
+    """The two senses of the single ``beat`` verb (OBSERVE / YIELD)."""
+
+    OBSERVE = "OBSERVE"
+    YIELD = "YIELD"
 
 
-class Yield(BaseModel):
-    kind: Literal["yield"] = "yield"
-    value: "Expr"  # must be an observation variable
+class Beat(BaseModel):
+    # The taught surface syntax is one verb, ``beat``: ``beat(OBSERVE)`` senses
+    # (and must be assigned), ``beat(YIELD, obs)`` reports an observation. The
+    # discriminator ``kind`` is therefore ``"beat"`` (not observe/yield), so the
+    # schema the LLM emits against matches the language it is taught.
+    kind: Literal["beat"] = "beat"
+    op: BeatOp
+    value: "Expr | None" = None  # the observation variable; required when op is YIELD
 
 
 Expr = Annotated[
-    Union[Lit, Var, Attr, Compare, BoolOp, Act, Observe, Yield],
+    Union[Lit, Var, Attr, Compare, BoolOp, Act, Beat],
     Field(discriminator="kind"),
 ]
 
-for _m in (Lit, Var, Attr, Compare, BoolOp, Act, Observe, Yield):
+for _m in (Lit, Var, Attr, Compare, BoolOp, Act, Beat):
     _m.model_rebuild()
 
 

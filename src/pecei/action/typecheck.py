@@ -3,7 +3,7 @@
 Infers a type tag per variable (bool / obs / cell / str / int / void) and enforces:
   * ``If.test`` names a defined **bool** variable (the "if only accepts a bool
     variable" rule — the schema already made it a bare name, not an expression);
-  * ``beat(OBSERVE)`` (Observe) is only legal as the direct RHS of an Assign
+  * ``beat(OBSERVE)`` is only legal as the direct RHS of an Assign
     ("observe must be caught in a variable");
   * attribute navigation matches the object type (obs.front -> cell; cell.is_fire -> bool; ...).
 """
@@ -14,14 +14,14 @@ from .ast_nodes import (
     Assign,
     Attr,
     BoolOp,
+    Beat,
+    BeatOp,
     Compare,
     ExprStmt,
     If,
     Lit,
-    Observe,
     Program,
     Var,
-    Yield,
 )
 
 
@@ -45,7 +45,7 @@ def type_check(program: Program) -> None:
 
 def _stmt(s, env: dict[str, str]) -> None:
     if isinstance(s, Assign):
-        if isinstance(s.expr, Observe):
+        if isinstance(s.expr, Beat) and s.expr.op is BeatOp.OBSERVE:
             env[s.name] = "obs"
         else:
             env[s.name] = _expr(s.expr, env)
@@ -76,14 +76,14 @@ def _expr(e, env: dict[str, str]) -> str:
         if e.name not in env:
             raise CompileError(f"undefined variable {e.name!r}")
         return env[e.name]
-    if isinstance(e, Observe):
-        raise CompileError("beat(OBSERVE) must be assigned to a variable, not used inline")
-    if isinstance(e, Act):
-        return "bool"
-    if isinstance(e, Yield):
-        if _expr(e.value, env) != "obs":
+    if isinstance(e, Beat):
+        if e.op is BeatOp.OBSERVE:
+            raise CompileError("beat(OBSERVE) must be assigned to a variable, not used inline")
+        if e.value is None or _expr(e.value, env) != "obs":
             raise CompileError("beat(YIELD, ...) expects an observation variable")
         return "void"
+    if isinstance(e, Act):
+        return "bool"
     if isinstance(e, Attr):
         ot = _expr(e.obj, env)
         if ot == "obs" and e.attr in OBS_DIRS:

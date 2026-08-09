@@ -11,14 +11,14 @@ from .ast_nodes import (
     Assign,
     Attr,
     BoolOp,
+    Beat,
+    BeatOp,
     Compare,
     ExprStmt,
     If,
     Lit,
-    Observe,
     Program,
     Var,
-    Yield,
 )
 
 
@@ -60,8 +60,8 @@ def _expr(e) -> str:
         return joiner.join(_expr(o) for o in e.operands)
     if isinstance(e, Act):
         return f"act({e.action.value})"
-    if isinstance(e, Observe):
-        return "beat(OBSERVE)"
-    if isinstance(e, Yield):
+    if isinstance(e, Beat):
+        if e.op is BeatOp.OBSERVE:
+            return "beat(OBSERVE)"
         return f"beat(YIELD, {_expr(e.value)})"
     return "?"

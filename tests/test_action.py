@@ -7,6 +7,8 @@ from pecei.action import (
     Act,
     Assign,
     Attr,
+    Beat,
+    BeatOp,
     BoolOp,
     Compare,
     CompileError,
@@ -16,10 +18,8 @@ from pecei.action import (
     Interpreter,
     Lit,
     NavObs,
-    Observe,
     Program,
     Var,
-    Yield,
     pretty,
     type_check,
 )
@@ -59,7 +59,7 @@ def _make_host(world, ego_eid, budget=50):
 def _sense_front_program():
     """ob = beat(OBSERVE); blocked = ob.front.is_blocked; if blocked: turn else: forward"""
     return Program(body=[
-        Assign(name="ob", expr=Observe()),
+        Assign(name="ob", expr=Beat(op=BeatOp.OBSERVE)),
         Assign(name="blocked", expr=Attr(obj=Attr(obj=Var(name="ob"), attr="front"), attr="is_blocked")),
         If(test="blocked",
            then=[ExprStmt(expr=Act(action=ActionType.TURNRIGHT))],
@@ -94,8 +94,8 @@ def test_yield_writes_observation():
     world = _eye_world_with_wall()
     eng, host, yielded = _make_host(world, "ego")
     prog = Program(body=[
-        Assign(name="ob", expr=Observe()),
-        ExprStmt(expr=Yield(value=Var(name="ob"))),
+        Assign(name="ob", expr=Beat(op=BeatOp.OBSERVE)),
+        ExprStmt(expr=Beat(op=BeatOp.YIELD, value=Var(name="ob"))),
     ])
     Interpreter(host).run(prog)
     assert len(yielded) == 1
@@ -117,7 +117,7 @@ def test_act_round_budget_propagates():
 
 def test_if_requires_bool_variable():
     bad = Program(body=[
-        Assign(name="ob", expr=Observe()),
+        Assign(name="ob", expr=Beat(op=BeatOp.OBSERVE)),
         If(test="ob", then=[], orelse=[]),  # ob is obs, not bool
     ])
     with pytest.raises(CompileError):
@@ -131,14 +131,14 @@ def test_if_test_is_structurally_a_name_not_expression():
 
 
 def test_observe_must_be_assigned():
-    bad = Program(body=[ExprStmt(expr=Observe())])  # bare observe, not caught
+    bad = Program(body=[ExprStmt(expr=Beat(op=BeatOp.OBSERVE))])  # bare observe, not caught
     with pytest.raises(CompileError):
         type_check(bad)
 
 
 def test_bool_op_and_compare_typecheck():
     prog = Program(body=[
-        Assign(name="ob", expr=Observe()),
+        Assign(name="ob", expr=Beat(op=BeatOp.OBSERVE)),
         Assign(name="b1", expr=Attr(obj=Attr(obj=Var(name="ob"), attr="front"), attr="is_fire")),
         Assign(name="b2", expr=Attr(obj=Attr(obj=Var(name="ob"), attr="left"), attr="is_water")),
         Assign(name="b", expr=BoolOp(op="or", operands=[Var(name="b1"), Var(name="b2")])),
@@ -160,7 +160,7 @@ def test_json_schema_generated():
 
 def test_pretty_renders_text_dsl():
     prog = Program(body=[
-        Assign(name="ob", expr=Observe()),
+        Assign(name="ob", expr=Beat(op=BeatOp.OBSERVE)),
         If(test="blocked", then=[ExprStmt(expr=Act(action=ActionType.FORWARD))], orelse=[]),
     ])
     text = pretty(prog)

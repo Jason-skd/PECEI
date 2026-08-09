@@ -5,7 +5,7 @@ observation, then advance three times — reaches example02's goal in one cycle.
 """
 from __future__ import annotations
 
-from pecei.action import Act, Assign, ExprStmt, Observe, Program, Var, Yield
+from pecei.action import Act, Assign, Beat, BeatOp, ExprStmt, Program, Var
 from pecei.world.actions import ActionType
 
 from ..protocol import Directive, TurnInput, TurnOutput
@@ -18,8 +18,8 @@ def default_program() -> Program:
     (5 forward from (3,2) EAST -> goal (8,2)); on other maps it just drives east.
     """
     return Program(body=[
-        Assign(name="ob", expr=Observe()),
-        ExprStmt(expr=Yield(value=Var(name="ob"))),
+        Assign(name="ob", expr=Beat(op=BeatOp.OBSERVE)),
+        ExprStmt(expr=Beat(op=BeatOp.YIELD, value=Var(name="ob"))),
         ExprStmt(expr=Act(action=ActionType.FORWARD)),
         ExprStmt(expr=Act(action=ActionType.FORWARD)),
         ExprStmt(expr=Act(action=ActionType.FORWARD)),

@@ -18,14 +18,14 @@ from .ast_nodes import (
     Assign,
     Attr,
     BoolOp,
+    Beat,
+    BeatOp,
     Compare,
     ExprStmt,
     If,
     Lit,
-    Observe,
     Program,
     Var,
-    Yield,
 )
 from .typecheck import type_check
 from .views import NavObs
@@ -82,13 +82,13 @@ class Interpreter:
             return e.value
         if isinstance(e, Var):
             return env[e.name]
-        if isinstance(e, Observe):
-            return self.host.observe()
+        if isinstance(e, Beat):
+            if e.op is BeatOp.OBSERVE:
+                return self.host.observe()
+            self.host.yield_(self._eval(e.value, env))  # YIELD
+            return None
         if isinstance(e, Act):
             return self.host.act(e.action)
-        if isinstance(e, Yield):
-            self.host.yield_(self._eval(e.value, env))
-            return None
         if isinstance(e, Attr):
             return getattr(self._eval(e.obj, env), e.attr)
         if isinstance(e, Compare):
