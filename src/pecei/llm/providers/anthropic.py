@@ -6,10 +6,10 @@ rejects recursion; non-strict tool-use accepts $defs/$ref).
 """
 from __future__ import annotations
 
-from pecei.action import Program
+from pecei.action import CompileError
 
 from ..prompt import PLAN_TOOL_DESCRIPTION, PROGRAM_SCHEMA, SYSTEM_PROMPT, render_user
-from ..protocol import Directive, TurnInput, TurnOutput
+from ..protocol import Directive, TurnInput, TurnOutput, parse_program
 
 DEFAULT_MODEL = "claude-haiku-4-5"
 
@@ -51,14 +51,19 @@ class AnthropicProvider:
         resp = self._client.messages.create(**req)
         program: Program | None = None
         reflection: str | None = None
+        error: str | None = None
         for block in resp.content:
             if getattr(block, "type", None) == "tool_use" and block.name == "plan":
-                program = Program.model_validate(block.input)
+                try:
+                    program = parse_program(block.input)
+                except CompileError as e:           # malformed AST -> COMPILE_ERROR
+                    error = str(e)
             elif getattr(block, "type", None) == "text" and reflection is None:
                 reflection = block.text
         return TurnOutput(
             program=program,
             reflection=reflection,
+            error=error,
             raw_request={**req, "provider": self.name},
             raw_response=resp.to_dict(),
         )

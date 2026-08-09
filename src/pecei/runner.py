@@ -7,15 +7,17 @@ observations as :class:`Feedback` for the next cycle. There is **no per-round
 ``decide`` loop** — the author is blind while the script runs and only learns
 after it stops.
 
-Stop reasons: ``SUCCESS`` (goal reached) | ``ROUND_LIMIT_EXCEED`` (budget) |
-``ENERGY_RUN_OUT`` (reserved) | ``SCRIPT_ENDED`` (body exhausted / no script).
-``world_at_step`` reconstructs ground truth for the replay viewer.
+Stop reasons: ``SUCCESS`` (goal reached) | ``COMPILE_ERROR`` (script didn't
+compile — bad AST or type error; message fed back) | ``ROUND_LIMIT_EXCEED``
+(budget) | ``ENERGY_RUN_OUT`` (reserved) | ``SCRIPT_ENDED`` (body fully executed,
+budget remaining, goal not reached). ``world_at_step`` reconstructs ground truth
+for the replay viewer.
 """
 from __future__ import annotations
 
 from dataclasses import dataclass
 
-from pecei.action import BudgetExceeded, Host, Interpreter, NavObs, pretty
+from pecei.action import BudgetExceeded, CompileError, Host, Interpreter, NavObs, pretty
 from pecei.engine import RoundEngine
 from pecei.infra import FailureSnapshot, Result, Trace, TraceEvent, build_report
 from pecei.llm import Directive, Feedback, LLMProvider, TurnInput
@@ -30,6 +32,7 @@ class ScriptRun:
     rounds: int
     yielded: list[dict]
     failure_snapshot: FailureSnapshot | None
+    compile_error: str | None                 # set iff stop_reason is COMPILE_ERROR
     trace: Trace
     raw_request: dict | None
     raw_response: dict | None
@@ -40,6 +43,7 @@ class ScriptRun:
             rounds_used=self.rounds,
             yielded=list(self.yielded),
             failure_snapshot=self.failure_snapshot,
+            compile_error=self.compile_error,
         )
 
 
@@ -105,11 +109,14 @@ def run_script(
     )
     out = provider.decide(turn)                    # ONE LLM request per cycle
     program = out.program
+    compile_error: str | None = out.error          # A-layer: malformed AST (parse failed)
 
     stopped_by = "body"
-    if program is not None:
+    if program is not None and compile_error is None:
         try:
-            interp.run(program)
+            interp.run(program)                    # runs type_check first (B-layer)
+        except CompileError as e:
+            compile_error = str(e)                 # B-layer: well-formed AST, type error
         except RuntimeError:
             stopped_by = "budget"        # round budget exhausted mid-script (eng.apply)
         except BudgetExceeded:
@@ -118,12 +125,14 @@ def run_script(
     # at_goal is authoritative for SUCCESS, regardless of how execution stopped
     if eng.at_goal(ego_eid):
         result = Result.SUCCESS
+    elif compile_error is not None:
+        result = Result.COMPILE_ERROR              # script didn't compile (A or B layer)
     elif program is None:
-        result = Result.SCRIPT_ENDED             # author returned no script
+        result = Result.SCRIPT_ENDED               # author gave no script / empty body
     elif stopped_by == "budget":
         result = Result.ROUND_LIMIT_EXCEED
     else:
-        result = Result.SCRIPT_ENDED             # body exhausted without reaching goal
+        result = Result.SCRIPT_ENDED               # body fully executed, goal not reached
 
     report = build_report(
         world, result, goal=goal, yielded=yielded, round=eng.round, round_budget=round_budget
@@ -141,6 +150,7 @@ def run_script(
         rounds=eng.round,
         yielded=yielded,
         failure_snapshot=report.failure_snapshot,
+        compile_error=compile_error,
         trace=trace,
         raw_request=out.raw_request,
         raw_response=out.raw_response,

@@ -16,13 +16,19 @@ PROGRAM_SCHEMA = Program.model_json_schema()
 
 PLAN_TOOL_DESCRIPTION = (
     "Emit the agent's COMPLETE script for this cycle — a sequence of statements "
-    "that runs autonomously from the start until it stops. Statements: "
-    "act(FORWARD|BACKWARD|TURNLEFT|TURNRIGHT), ob = beat(OBSERVE), "
-    "beat(YIELD, ob), b = <bool predicate>, if <bool_var>: ... else: .... "
-    "RULE: an if-condition must be a bool *variable name* (string), never an "
-    "expression; compute any predicate into a bool variable first. "
-    "beat(OBSERVE) must be assigned to a variable before its attributes are used. "
-    "The script runs blind — you receive no feedback until it stops."
+    "that runs autonomously from the start until it stops. The script runs blind "
+    "(you receive no feedback until it stops). Statements:\n"
+    "  act(FORWARD|BACKWARD|TURNLEFT|TURNRIGHT)  # MOVE — the ONLY valid act args\n"
+    "  ob = beat(OBSERVE)                        # sense now; MUST assign to a variable\n"
+    "  beat(YIELD, ob)                           # report an observation (fed back to you)\n"
+    "  b = ob.front.is_blocked                   # bool predicate\n"
+    "  if <bool_var>: ... else: ...              # condition MUST be a bare bool variable\n"
+    "TWO VERBS, never mix their arguments: `act` takes ONLY a movement "
+    "(FORWARD/BACKWARD/TURNLEFT/TURNRIGHT); `beat` takes ONLY OBSERVE or YIELD. "
+    "So `act(YIELD)` and `beat(FORWARD)` are ALWAYS wrong. RULE: an if-condition "
+    "is a bool *variable name* (string), never an expression; compute any "
+    "predicate into a bool variable first. beat(OBSERVE) must be assigned to a "
+    "variable before its attributes are used."
 )
 
 SYSTEM_PROMPT = """\
@@ -32,15 +38,20 @@ until it stops. You get NO live feedback while it runs.
 
 You are blind to the live simulation. You learn ONLY from what is fed back after
 each script stops: the observations you chose to beat(YIELD), and the stop-report
-(why it stopped: SUCCESS / ROUND_LIMIT_EXCEED / ENERGY_RUN_OUT / SCRIPT_ENDED).
-Use that feedback to write a better script next cycle.
+(why it stopped: SUCCESS / COMPILE_ERROR / ROUND_LIMIT_EXCEED / ENERGY_RUN_OUT /
+SCRIPT_ENDED). COMPILE_ERROR means your script did not compile (illegal act/beat
+argument, undefined variable, non-bool if-condition, ...); the exact error is
+shown to you — fix it. SCRIPT_ENDED means it ran to completion with budget left
+but did not reach the goal. Use that feedback to write a better script next cycle.
 
 Minimal language:
-  act(FORWARD|BACKWARD|TURNLEFT|TURNRIGHT)   # one round each
+  act(FORWARD|BACKWARD|TURNLEFT|TURNRIGHT)   # one round each — act takes ONLY a movement
   ob = beat(OBSERVE)                          # sense now; MUST assign to a variable
   beat(YIELD, ob)                             # report an observation (fed back to you)
   b = ob.front.is_blocked                     # bool predicate
   if <bool_var>: ... else: ...                # condition MUST be a bare bool variable
+`act` and `beat` are different verbs: act takes ONLY a movement, beat takes ONLY
+OBSERVE/YIELD — never write act(YIELD) or beat(FORWARD).
 
 Cell predicates (relative to facing: front/left/right/back/here):
   is_fire is_water is_stone is_wood is_metal is_wheel is_brain is_empty is_blocked is_goal
@@ -79,6 +90,8 @@ def render_user(turn: TurnInput) -> str:
     fb = turn.feedback
     if fb:
         lines.append(f"last_cycle stopped: {fb.stop_reason.value} after {fb.rounds_used} rounds.")
+        if fb.compile_error:
+            lines.append(f"  compile error: {fb.compile_error}")
         if fb.failure_snapshot:
             lines.append(f"  ended near {tuple(fb.failure_snapshot.pos)}, "
                          f"complexity {fb.failure_snapshot.complexity}.")
@@ -93,6 +106,8 @@ def render_user(turn: TurnInput) -> str:
         lines.append("prior_cycles (snowball — learn from these):")
         for c in turn.snowball:
             lines.append(f"  cycle {c.get('index')}: {c.get('stop_reason')} in {c.get('rounds')} rounds")
+            if c.get("error"):
+                lines.append(f"    compile error: {c.get('error')}")
             for s in c.get("scripts") or []:
                 lines.append("    script:")
                 for ln in str(s).splitlines():

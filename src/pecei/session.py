@@ -42,6 +42,7 @@ class CycleRecord(BaseModel):
     stop_reason: Result
     rounds: int
     failure_snapshot: FailureSnapshot | None = None
+    compile_error: str | None = None       # set iff stop_reason is COMPILE_ERROR
     trace_path: str | None = None          # authoritative per-cycle record (rounds/yielded/LLM-IO)
 
 
@@ -74,6 +75,7 @@ class Session(BaseModel):
                 "stop_reason": c.stop_reason.value,
                 "rounds": c.rounds,
                 "scripts": [c.script] if c.script else [],
+                "error": c.compile_error,
             }
             for c in self.cycles
         ]
@@ -95,6 +97,7 @@ class Session(BaseModel):
             rounds_used=last.rounds,
             yielded=yielded,
             failure_snapshot=last.failure_snapshot,
+            compile_error=last.compile_error,
         )
 
     def run_one_cycle(
@@ -127,6 +130,7 @@ class Session(BaseModel):
             stop_reason=run.stop_reason,
             rounds=run.rounds,
             failure_snapshot=run.failure_snapshot,
+            compile_error=run.compile_error,
             trace_path=trace_path,
         )
         self.cycles.append(rec)
@@ -218,6 +222,8 @@ def interactive_loop(
 
 def _print_cycle(rec: CycleRecord) -> None:
     print(f"\n[cycle {rec.index}] stop={rec.stop_reason.value} rounds={rec.rounds}")
+    if rec.compile_error:
+        print(f"  compile error: {rec.compile_error}")
     if rec.failure_snapshot:
         print(f"  ended near {tuple(rec.failure_snapshot.pos)}, "
               f"complexity {rec.failure_snapshot.complexity}")

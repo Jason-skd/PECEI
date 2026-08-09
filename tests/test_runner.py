@@ -1,7 +1,7 @@
 """Script-runner tests: one decide() per cycle + stop-reason mapping + feedback."""
 from pathlib import Path
 
-from pecei.action import Act, Assign, ExprStmt, Observe, Program
+from pecei.action import Act, Assign, ExprStmt, If, Observe, Program
 from pecei.infra import Result
 from pecei.llm import MockProvider
 from pecei.llm.protocol import TurnInput, TurnOutput
@@ -27,6 +27,17 @@ class _Count:
         return self._m.decide(turn)
 
 
+class _Fixed:
+    """Provider that returns one fixed TurnOutput (drives COMPILE_ERROR-path tests)."""
+    name = "fixed"
+
+    def __init__(self, out: TurnOutput) -> None:
+        self._out = out
+
+    def decide(self, turn: TurnInput) -> TurnOutput:
+        return self._out
+
+
 def test_one_decide_per_cycle_and_success():
     p = _Count()
     r = run_script(str(EXAMPLE02), p, round_budget=50)
@@ -47,6 +58,27 @@ def test_script_ended_when_body_has_no_acts():
     r = run_script(str(EXAMPLE02), inert, round_budget=50)
     assert r.stop_reason is Result.SCRIPT_ENDED
     assert r.rounds == 0
+    assert r.compile_error is None          # body fully executed, no compile fault
+
+
+def test_compile_error_on_malformed_ast():
+    # A-layer: provider parsed a malformed tool-call (e.g. act(YIELD)) -> error set
+    out = TurnOutput(program=None, error="at body.0.expr.act.action: bad action 'YIELD'")
+    r = run_script(str(EXAMPLE02), _Fixed(out), round_budget=50)
+    assert r.stop_reason is Result.COMPILE_ERROR
+    assert r.rounds == 0
+    assert r.program == ""                  # nothing ran
+    assert "YIELD" in (r.compile_error or "")
+
+
+def test_compile_error_on_typecheck_failure():
+    # B-layer: well-formed AST but type_check rejects it (if on undefined var)
+    bad = Program(body=[If(test="never_defined",
+                           then=[ExprStmt(expr=Act(action=ActionType.FORWARD))])])
+    r = run_script(str(EXAMPLE02), MockProvider(program=bad), round_budget=50)
+    assert r.stop_reason is Result.COMPILE_ERROR
+    assert r.rounds == 0
+    assert "never_defined" in (r.compile_error or "")
 
 
 def test_feedback_and_snowball_wired_into_next_cycle():

@@ -1,10 +1,10 @@
 """OpenAI-compatible provider. Covers OpenAI and DeepSeek (via base_url)."""
 from __future__ import annotations
 
-from pecei.action import Program
+from pecei.action import CompileError
 
 from ..prompt import PLAN_TOOL_DESCRIPTION, PROGRAM_SCHEMA, SYSTEM_PROMPT, render_user
-from ..protocol import Directive, TurnInput, TurnOutput
+from ..protocol import Directive, TurnInput, TurnOutput, parse_program
 
 DEFAULT_MODEL = "gpt-4o-mini"
 DEEPSEEK_BASE_URL = "https://api.deepseek.com"
@@ -51,13 +51,18 @@ class OpenAIProvider:
         resp = self._client.chat.completions.create(**req)
         msg = resp.choices[0].message
         program: Program | None = None
+        error: str | None = None
         if msg.tool_calls:
             call = msg.tool_calls[0]
             if call.function.name == "plan":
-                program = Program.model_validate_json(call.function.arguments)
+                try:
+                    program = parse_program(call.function.arguments)
+                except CompileError as e:           # malformed AST -> COMPILE_ERROR
+                    error = str(e)
         return TurnOutput(
             program=program,
             reflection=msg.content,
+            error=error,
             raw_request={**req, "provider": self.name},
             raw_response=resp.model_dump(),
         )
