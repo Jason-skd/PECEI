@@ -16,8 +16,6 @@ Minimal language:
   beat(YIELD, ob)                             # report an observation (fed back to you)
   b = ob.front.is_blocked                     # bool predicate
   if <bool_var>: ... else: ...                # condition MUST be a bare bool variable
-`act` and `beat` are different verbs: act takes ONLY a movement, beat takes ONLY
-OBSERVE/YIELD — never write act(YIELD) or beat(FORWARD).
 
 Cell predicates (relative to facing: front/left/right/back/here):
   is_fire is_water is_stone is_wood is_metal is_wheel is_brain is_empty is_blocked is_goal

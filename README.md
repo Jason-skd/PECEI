@@ -58,9 +58,6 @@ Precedence: `--api-key`/`--base-url` flag > `.env`/env > built-in default.
 # preview a map in a window (ESC/Q to quit) — eyeball that the world renders
 uv run python -m pecei.render src/pecei/maps/01_corridor.yaml
 
-# run ONE script cycle on a map, print its stop-report
-uv run pecei run src/pecei/maps/01_corridor.yaml --provider mock
-
 # interactive: space advances one cycle, stops on SUCCESS, Ctrl+C saves & quits
 uv run pecei epoch src/pecei/maps/01_corridor.yaml --provider mock
 

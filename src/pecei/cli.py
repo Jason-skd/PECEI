@@ -1,9 +1,8 @@
-"""CLI entry: ``pecei run | epoch | auto | experiment | replay | transcript``.
+"""CLI entry: ``pecei epoch | auto | experiment | replay | transcript``.
 
 One cycle = one LLM request (the author writes a full script, it runs to a stop,
 then feedback is returned). There is no per-round reactive loop.
 
-- ``run``        : one script cycle on a map, print its stop-report.
 - ``epoch``      : interactive — space advances one cycle; session stops on SUCCESS.
 - ``auto``       : train one map automatically until SUCCESS / cycle budget.
 - ``experiment`` : train a folder of ``NN_slug`` maps, one session each, in order.
@@ -23,13 +22,6 @@ def main(argv: list[str] | None = None) -> int:
     load_env()  # populate os.environ from .env (api_key / base_url) if present
     parser = argparse.ArgumentParser(prog="pecei", description="PECEI embodied-AI harness")
     sub = parser.add_subparsers(dest="cmd", required=True)
-
-    p_run = sub.add_parser("run", help="run ONE script cycle and print its stop-report")
-    p_run.add_argument("map", help="path to a .yaml/.json map")
-    p_run.add_argument("--provider", default="mock", help="mock | anthropic | openai | deepseek")
-    p_run.add_argument("--round-budget", type=int, default=100)
-    p_run.add_argument("--api-key", default=None, help="provider API key (else env)")
-    p_run.add_argument("--base-url", default=None, help="provider base URL / relay endpoint")
 
     p_ep = sub.add_parser(
         "epoch", help="interactive: space advances one cycle, stops on SUCCESS, Ctrl+C saves & quits")
@@ -79,8 +71,6 @@ def main(argv: list[str] | None = None) -> int:
     p_tr.add_argument("--print", action="store_true", help="print to stdout instead of writing a file")
 
     args = parser.parse_args(argv)
-    if args.cmd == "run":
-        return _run(args)
     if args.cmd == "epoch":
         return _epoch(args)
     if args.cmd == "auto":
@@ -102,26 +92,6 @@ def _provider_kwargs(args, provider_name: str) -> dict:
         if getattr(args, "base_url", None):
             kwargs["base_url"] = args.base_url
     return kwargs
-
-
-def _run(args) -> int:
-    from pecei.runner import run_script
-
-    provider = make_provider(args.provider, **_provider_kwargs(args, args.provider))
-    run = run_script(args.map, provider, round_budget=args.round_budget)
-
-    print(f"stop_reason: {run.stop_reason.value}")
-    print(f"rounds: {run.rounds}  yielded: {len(run.yielded)}")
-    if run.failure_snapshot:
-        print(f"ended near {tuple(run.failure_snapshot.pos)}, "
-              f"complexity {run.failure_snapshot.complexity}")
-    print(f"script:\n{run.program}")
-
-    trace_path = str(Path(args.map).with_suffix(".trace.jsonl"))
-    run.trace.write(trace_path)
-    print(f"\ntrace -> {trace_path}")
-    print(f"replay: uv run python -m pecei replay {args.map} {trace_path}")
-    return 0
 
 
 def _epoch(args) -> int:
