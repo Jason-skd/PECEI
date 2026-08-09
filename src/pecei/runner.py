@@ -64,6 +64,7 @@ def run_script(
     *,
     feedback: Feedback | None = None,
     snowball: list[dict] | None = None,
+    instructions: str | None = None,
     round_budget: int = 100,
     ego_eid: str | None = None,
 ) -> ScriptRun:
@@ -97,6 +98,7 @@ def run_script(
 
     turn = TurnInput(
         directive=Directive.PLAN,
+        instructions=instructions,
         map_desc=map_desc(world),
         feedback=feedback,
         snowball=snowball or [],

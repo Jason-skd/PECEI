@@ -32,7 +32,7 @@ def test_one_decide_per_cycle_and_success():
     r = run_script(str(EXAMPLE02), p, round_budget=50)
     assert p.n == 1                       # exactly ONE LLM request per cycle
     assert r.stop_reason is Result.SUCCESS
-    assert r.rounds == 3
+    assert r.rounds == 5                  # 3 east to goal + 2 blocked (east edge); blocked acts still cost a round
     assert len(r.yielded) == 1
     assert p.last_turn is not None and p.last_turn.feedback is None   # cycle 1 has no feedback
 

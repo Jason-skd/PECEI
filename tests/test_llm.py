@@ -16,18 +16,20 @@ def test_mock_decide_returns_complete_script():
 
 def test_turninput_shape_is_feedback_not_live_observation():
     fields = {f.name for f in dataclasses.fields(TurnInput)}
-    assert {"map_desc", "feedback", "snowball"} <= fields
+    assert {"map_desc", "feedback", "snowball", "instructions"} <= fields
     assert "observation" not in fields              # live per-round observation removed
 
 
-def test_render_user_shows_static_map_and_feedback_not_live_obs():
+def test_render_user_shows_static_map_feedback_and_instructions():
     turn = TurnInput(
+        instructions="experiment session 2 of 4: map 'maze'",
         map_desc={"width": 6, "height": 5, "goal": [6, 2],
                   "ego": {"anchor": [3, 2], "orientation": "EAST"}, "entities": []},
         feedback=Feedback(stop_reason=Result.SCRIPT_ENDED, rounds_used=1),
     )
     out = render_user(turn)
     assert "DIRECTIVE: PLAN" in out
+    assert "INSTRUCTIONS" in out and "2 of 4" in out
     assert "map:" in out and "goal [6, 2]" in out
     assert "last_cycle stopped: SCRIPT_ENDED" in out
     assert "Visible cells" not in out               # no live observation leak

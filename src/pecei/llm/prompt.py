@@ -61,6 +61,9 @@ def _fmt_obs(y: dict) -> str:
 def render_user(turn: TurnInput) -> str:
     lines = [f"DIRECTIVE: {turn.directive.value}"]
 
+    if turn.instructions:
+        lines.append(f"INSTRUCTIONS (authoritative): {turn.instructions}")
+
     md = turn.map_desc
     if md:
         ego = md.get("ego") or {}
@@ -91,7 +94,9 @@ def render_user(turn: TurnInput) -> str:
         for c in turn.snowball:
             lines.append(f"  cycle {c.get('index')}: {c.get('stop_reason')} in {c.get('rounds')} rounds")
             for s in c.get("scripts") or []:
-                lines.append(f"    - {s}")
+                lines.append("    script:")
+                for ln in str(s).splitlines():
+                    lines.append(f"      {ln}")
 
     if turn.directive is Directive.PLAN:
         lines.append("Call the `plan` tool with your complete script.")

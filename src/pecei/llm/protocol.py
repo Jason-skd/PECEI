@@ -16,7 +16,11 @@ from pecei.infra import FailureSnapshot, Result
 
 
 class Directive(str, Enum):
-    PLAN = "PLAN"  # author a script that runs from start to stop
+    PLAN = "PLAN"        # author a script that runs from start to stop
+    # forward-compat (triple-loop memory ops; structured-field contract lands later):
+    REFLECT = "REFLECT"  # verbal reflection on a failure (§5.2 Reflexion)
+    COMPRESS = "COMPRESS"  # distill snowball into durable principles (§5.4)
+    STORE = "STORE"      # persist an atom/principle to shared memory (§5.3)
 
 
 @dataclass
@@ -33,6 +37,7 @@ class Feedback:
 @dataclass
 class TurnInput:
     directive: Directive = Directive.PLAN
+    instructions: str | None = None                          # authoritative, author-immutable (e.g. experiment k/N, role)
     map_desc: dict = field(default_factory=dict)             # static puzzle: size, goal, ego pose, entities
     feedback: Feedback | None = None                         # previous cycle's outcome (None on first cycle)
     snowball: list[dict] = field(default_factory=list)       # prior cycles: {index, script, stop_reason, rounds, ...}

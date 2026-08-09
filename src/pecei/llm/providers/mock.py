@@ -12,10 +12,16 @@ from ..protocol import Directive, TurnInput, TurnOutput
 
 
 def default_program() -> Program:
-    """ob = beat(OBSERVE); beat(YIELD, ob); act(FORWARD) x3."""
+    """ob = beat(OBSERVE); beat(YIELD, ob); act(FORWARD) x5.
+
+    Open-loop (one decide per cycle). Solves ``01_corridor.yaml`` in one cycle
+    (5 forward from (3,2) EAST -> goal (8,2)); on other maps it just drives east.
+    """
     return Program(body=[
         Assign(name="ob", expr=Observe()),
         ExprStmt(expr=Yield(value=Var(name="ob"))),
+        ExprStmt(expr=Act(action=ActionType.FORWARD)),
+        ExprStmt(expr=Act(action=ActionType.FORWARD)),
         ExprStmt(expr=Act(action=ActionType.FORWARD)),
         ExprStmt(expr=Act(action=ActionType.FORWARD)),
         ExprStmt(expr=Act(action=ActionType.FORWARD)),
