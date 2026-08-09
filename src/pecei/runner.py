@@ -21,6 +21,7 @@ from pecei.action import BudgetExceeded, CompileError, Host, Interpreter, NavObs
 from pecei.engine import RoundEngine
 from pecei.infra import FailureSnapshot, Result, Trace, TraceEvent, build_report
 from pecei.llm import Directive, Feedback, LLMProvider, TurnInput
+from pecei.llm.prompt import SYSTEM_PROMPT, render_user
 from pecei.observation import observe
 from pecei.world import ActionType, World, apply_action, load_world
 
@@ -34,6 +35,7 @@ class ScriptRun:
     failure_snapshot: FailureSnapshot | None
     compile_error: str | None                 # set iff stop_reason is COMPILE_ERROR
     trace: Trace
+    prompt: dict | None                       # {system, user} shown to the author (drift-stable record)
     raw_request: dict | None
     raw_response: dict | None
 
@@ -107,6 +109,10 @@ def run_script(
         feedback=feedback,
         snowball=snowball or [],
     )
+    # Record exactly what the author was shown this cycle. The system prompt may
+    # drift across versions, so capturing it per-cycle lets replay reproduce the
+    # author's true context regardless of later edits to prompt.py.
+    prompt = {"system": SYSTEM_PROMPT, "user": render_user(turn)}
     out = provider.decide(turn)                    # ONE LLM request per cycle
     program = out.program
     compile_error: str | None = out.error          # A-layer: malformed AST (parse failed)
@@ -152,6 +158,7 @@ def run_script(
         failure_snapshot=report.failure_snapshot,
         compile_error=compile_error,
         trace=trace,
+        prompt=prompt,
         raw_request=out.raw_request,
         raw_response=out.raw_response,
     )

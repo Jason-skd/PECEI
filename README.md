@@ -55,26 +55,35 @@ Precedence: `--api-key`/`--base-url` flag > `.env`/env > built-in default.
 ## Usage
 
 ```bash
+# preview a map in a window (ESC/Q to quit) — eyeball that the world renders
+uv run python -m pecei.render src/pecei/maps/01_corridor.yaml
+
 # run ONE script cycle on a map, print its stop-report
-uv run pecei run maps/01_corridor.yaml --provider mock
+uv run pecei run src/pecei/maps/01_corridor.yaml --provider mock
 
 # interactive: space advances one cycle, stops on SUCCESS, Ctrl+C saves & quits
-uv run pecei epoch maps/01_corridor.yaml --provider mock
+uv run pecei epoch src/pecei/maps/01_corridor.yaml --provider mock
 
 # auto-train one map until SUCCESS / cycle budget
-uv run pecei auto maps/02_one_wall.yaml --provider mock --budget 20
+uv run pecei auto src/pecei/maps/02_one_wall.yaml --provider mock --budget 20
 
 # train a whole experiment (a folder of NN_slug maps), one session each, in order
 uv run pecei experiment src/pecei/maps --provider mock
 
 # replay a single epoch (one trace)
-uv run pecei replay maps/04_maze.yaml path/to/xxx.trace.jsonl
+uv run pecei replay src/pecei/maps/04_maze.yaml sessions/04_maze.traces/04_maze.c001.trace.jsonl
 
 # browse a session's epochs, pick one, replay it (or play-to-end)
-uv run pecei replay maps/04_maze.yaml --session sessions/04_maze.session.json
+uv run pecei replay src/pecei/maps/04_maze.yaml --session sessions/04_maze.session.json
+
+# render authored scripts (AST->text): one trace / a session / a whole experiment
+uv run pecei transcript sessions/04_maze.traces/04_maze.c001.trace.jsonl
+uv run pecei transcript --session sessions/04_maze.session.json
+uv run pecei transcript --experiment sessions            # one <slug>.transcript.txt per session
+uv run pecei transcript --session sessions/04_maze.session.json --with-prompts --print
 ```
 
-Replace `maps/...` with `src/pecei/maps/...` if you run from the repo root. Use `--provider anthropic` (or `openai` / `deepseek`) instead of `mock` once `.env` is set.
+`auto` / `epoch` / `experiment` write per-cycle traces under `sessions/<map>.traces/` and, **by default, also dump a `sessions/<map>.transcript.txt`** (every cycle's script, one block each) when a session ends — pass `--no-transcript` to skip. The `transcript` command renders the same view on demand; it does no simulation, just surfaces the scripts already stored in the session/trace. Use `--provider anthropic` (or `openai` / `deepseek`) instead of `mock` once `.env` is set.
 
 **Maps** (`src/pecei/maps/`, `NN_slug.yaml` = order + readable name):
 - `01_corridor` — straight east; baseline solvability.
@@ -101,7 +110,7 @@ world/  ──▶  observation/  ──▶  action/ (AST + interpreter)  ──�
                                       ▲
    llm/ (protocol + adapters) ────────┤   render/ (headless renderer + assets)
                                       │
-            runner/ ──▶  session/ ──▶  cli/ ──▶  replay/   experiment/
+            runner/ ──▶  session/ ──▶  cli/ ──▶  replay/   experiment/   transcript/
 ```
 
 - **world** — ground-truth grid + rigid multi-cell `Entity` (components: stone/wood/fire/water/wheel/brain/metal), YAML/JSON map parser.
@@ -114,12 +123,14 @@ world/  ──▶  observation/  ──▶  action/ (AST + interpreter)  ──�
 - **session** — snowballs `CycleRecord`s; the trace is the single source of truth (the session stores a summary + `trace_path`, yields are derived, not duplicated).
 - **experiment** — scans a `NN_slug` dir, trains each map as a session in order, injects "session k of N" via `instructions`.
 - **replay** — epoch-based viewer with image tiles, session browser, play-to-end.
+- **transcript** — renders a session's authored scripts (AST→text) at epoch / session / experiment granularity; no simulation, just surfaces the scripts stored on each `CycleRecord`.
 
 ### Key invariants
 - **No live observation to the author.** The LLM learns only from fed-back yields + report.
 - **One LLM request per cycle.** No per-round reactive `decide` loop.
 - **Reset-per-script.** Every cycle starts from the initial map.
 - **Same-source record.** The per-cycle trace is authoritative; the session references it.
+- **Drift-stable prompt record.** Each `CycleRecord.prompt` stores the exact `{system, user}` text shown to the author that cycle, so replay reproduces the author's true context even after `SYSTEM_PROMPT` later changes.
 
 ---
 

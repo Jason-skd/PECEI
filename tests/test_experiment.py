@@ -68,6 +68,19 @@ def test_auto_session_stops_on_first_success(tmp_path):
     assert (tmp_path / "s.json").exists()
 
 
+def test_auto_session_writes_transcript_on_end(tmp_path):
+    s = Session(map=str(CORRIDOR), provider="mock", round_budget=50)
+    auto_session(s, _Count(), tmp_path / "s.session.json", budget=10, trace_dir=None)
+    assert (tmp_path / "s.transcript.txt").exists()      # dumped next to the session
+
+
+def test_auto_session_skips_transcript_when_disabled(tmp_path):
+    s = Session(map=str(CORRIDOR), provider="mock", round_budget=50)
+    auto_session(s, _Count(), tmp_path / "s.session.json", budget=10, trace_dir=None,
+                 dump_transcript=False)
+    assert not (tmp_path / "s.transcript.txt").exists()
+
+
 def test_auto_session_respects_budget_when_unsolved(tmp_path):
     prov = _Count()
     s = Session(map=str(CORRIDOR), provider="mock", round_budget=1)  # budget 1 round -> never solves

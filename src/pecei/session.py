@@ -43,6 +43,7 @@ class CycleRecord(BaseModel):
     rounds: int
     failure_snapshot: FailureSnapshot | None = None
     compile_error: str | None = None       # set iff stop_reason is COMPILE_ERROR
+    prompt: dict | None = None             # {system, user} shown to the author (drift-stable replay record)
     trace_path: str | None = None          # authoritative per-cycle record (rounds/yielded/LLM-IO)
 
 
@@ -131,6 +132,7 @@ class Session(BaseModel):
             rounds=run.rounds,
             failure_snapshot=run.failure_snapshot,
             compile_error=run.compile_error,
+            prompt=run.prompt,
             trace_path=trace_path,
         )
         self.cycles.append(rec)
@@ -145,6 +147,7 @@ def auto_session(
     *,
     budget: int = 10,
     trace_dir: str | Path | None = None,
+    dump_transcript: bool = True,
 ) -> Session:
     """Run cycles automatically until SUCCESS or ``budget`` cycles are exhausted."""
     while True:
@@ -158,6 +161,8 @@ def auto_session(
         session.save(path)
         _print_cycle(rec)
     session.save(path)
+    if dump_transcript:
+        _dump_transcript(session, path)
     return session
 
 
@@ -187,6 +192,7 @@ def interactive_loop(
     *,
     trace_dir: str | Path | None = None,
     existed: bool = False,
+    dump_transcript: bool = True,
 ) -> Session:
     """Run one script cycle per keypress until SUCCESS / 'q' / Ctrl+C. Saves each cycle."""
     if session.cycles:
@@ -215,6 +221,8 @@ def interactive_loop(
             session.save(path)
             print(f"session saved -> {path}  ({len(session.cycles)} cycle(s), "
                   f"{session.success_count} success)")
+            if dump_transcript:
+                _dump_transcript(session, path)
         else:
             print("no cycles run — no session file written")
     return session
@@ -232,3 +240,13 @@ def _print_cycle(rec: CycleRecord) -> None:
         head = lines[0]
         more = " ..." if len(lines) > 1 else ""
         print(f"  script: {head}{more}")
+
+
+def _dump_transcript(session: "Session", path: str | Path) -> None:
+    """Write ``<path>.transcript.txt`` next to a just-saved session (lazy import)."""
+    from pecei import transcript
+
+    if not session.cycles:
+        return
+    tp = transcript.write(session, path)
+    print(f"transcript -> {tp}")

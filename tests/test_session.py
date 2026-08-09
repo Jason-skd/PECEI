@@ -51,3 +51,23 @@ def test_run_one_cycle_is_one_request_and_snowball_grows():
     assert p2.n == 1 and p2.has_feedback              # cycle 2: feedback present, one request
     assert p2.snowball_len == 1                        # snowball = the 1 prior cycle
     assert len(s.cycles) == 2
+
+
+def test_run_one_cycle_records_prompt():
+    s = Session(map=str(EXAMPLE02), provider="mock", round_budget=50)
+    s.run_one_cycle(MockProvider())
+    rec = s.cycles[0]
+    assert rec.prompt and set(rec.prompt) == {"system", "user"}
+    assert rec.prompt["system"].strip()                 # non-empty system prompt
+    assert "DIRECTIVE: PLAN" in rec.prompt["user"]      # render_user output captured
+
+
+def test_prompt_roundtrips_through_session_json(tmp_path):
+    s = Session(map="x.yaml")
+    s.cycles.append(CycleRecord(
+        index=1, script="act(FORWARD)", stop_reason=Result.SUCCESS, rounds=1,
+        prompt={"system": "SYS", "user": "USR"}))
+    out = tmp_path / "s.json"
+    s.save(out)
+    s2 = Session.load(out)
+    assert s2.cycles[0].prompt == {"system": "SYS", "user": "USR"}

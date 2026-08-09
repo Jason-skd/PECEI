@@ -46,6 +46,7 @@ def run_experiment(
     out_dir: str | Path = "sessions",
     budget: int = 10,
     round_budget: int = 100,
+    dump_transcript: bool = True,
 ) -> list[Session]:
     """Train each map in ``directory`` as its own session, in order. Returns the
     list of Sessions (each saved to ``out_dir/<slug>.session.json``)."""
@@ -67,7 +68,8 @@ def run_experiment(
         )
         sess_path = out / f"{ref.slug}.session.json"
         trace_dir = out / f"{ref.slug}.traces"
-        auto_session(sess, provider, sess_path, budget=budget, trace_dir=trace_dir)
+        auto_session(sess, provider, sess_path, budget=budget, trace_dir=trace_dir,
+                     dump_transcript=dump_transcript)
         sessions.append(sess)
 
     solved = sum(1 for s in sessions if s.success_count > 0)
