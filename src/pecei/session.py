@@ -14,9 +14,13 @@ record of rounds/yielded/LLM-IO. ``CycleRecord`` keeps only a small summary +
 from __future__ import annotations
 
 import sys
-import termios
-import tty
 from datetime import datetime, timezone
+
+if sys.platform == "win32":  # Unix-only modules; Windows uses msvcrt in read_key()
+    import msvcrt
+else:
+    import termios
+    import tty
 from pathlib import Path
 from typing import Any
 
@@ -176,6 +180,8 @@ def read_key() -> str:
     """
     if not sys.stdin.isatty():
         return sys.stdin.readline()
+    if sys.platform == "win32":
+        return msvcrt.getwch()
     fd = sys.stdin.fileno()
     old = termios.tcgetattr(fd)
     try:
