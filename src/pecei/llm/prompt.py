@@ -6,6 +6,8 @@ never a live per-round observation.
 """
 from __future__ import annotations
 
+from pathlib import Path
+
 from pecei.action import Program
 
 from .protocol import Directive, TurnInput
@@ -31,34 +33,29 @@ PLAN_TOOL_DESCRIPTION = (
     "variable before its attributes are used."
 )
 
-SYSTEM_PROMPT = """\
-You author a policy script for a grid rescue agent. Each cycle you emit ONE
-complete script via the `plan` tool; it then runs autonomously from the start
-until it stops. You get NO live feedback while it runs.
+# The author's system prompt lives in a co-located markdown file so it can be
+# edited as prose without touching Python. ``_SYSTEM_PROMPT_FILE`` resolves
+# relative to this module, so it works both from a source checkout and inside an
+# installed wheel (uv_build ships the .md with the package by default).
+_SYSTEM_PROMPT_FILE = Path(__file__).resolve().parent / "system prompt.md"
 
-You are blind to the live simulation. You learn ONLY from what is fed back after
-each script stops: the observations you chose to beat(YIELD), and the stop-report
-(why it stopped: SUCCESS / COMPILE_ERROR / ROUND_LIMIT_EXCEED / ENERGY_RUN_OUT /
-SCRIPT_ENDED). COMPILE_ERROR means your script did not compile (illegal act/beat
-argument, undefined variable, non-bool if-condition, ...); the exact error is
-shown to you — fix it. SCRIPT_ENDED means it ran to completion with budget left
-but did not reach the goal. Use that feedback to write a better script next cycle.
 
-Minimal language:
-  act(FORWARD|BACKWARD|TURNLEFT|TURNRIGHT)   # one round each — act takes ONLY a movement
-  ob = beat(OBSERVE)                          # sense now; MUST assign to a variable
-  beat(YIELD, ob)                             # report an observation (fed back to you)
-  b = ob.front.is_blocked                     # bool predicate
-  if <bool_var>: ... else: ...                # condition MUST be a bare bool variable
-`act` and `beat` are different verbs: act takes ONLY a movement, beat takes ONLY
-OBSERVE/YIELD — never write act(YIELD) or beat(FORWARD).
+def load_system_prompt() -> str:
+    """Return the author system prompt, read fresh from ``system prompt.md``.
 
-Cell predicates (relative to facing: front/left/right/back/here):
-  is_fire is_water is_stone is_wood is_metal is_wheel is_brain is_empty is_blocked is_goal
-  and .ctype (string) for equality checks.
-
-Author a full script that reaches the goal from the start pose given in the map.
-"""
+    Read on every call (not cached): developers can edit the markdown and the
+    next cycle picks up the change without a restart, and the per-cycle trace in
+    ``runner`` captures exactly what was sent. The entire file *is* the prompt —
+    nothing is stripped — so keep developer notes out of it or they reach the
+    model. A missing file raises with the resolved path rather than silently
+    sending an empty prompt.
+    """
+    try:
+        return _SYSTEM_PROMPT_FILE.read_text(encoding="utf-8")
+    except FileNotFoundError as e:  # pragma: no cover - fail loud, not silent
+        raise FileNotFoundError(
+            f"System prompt file not found: {_SYSTEM_PROMPT_FILE}"
+        ) from e
 
 
 def _fmt_obs(y: dict) -> str:

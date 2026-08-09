@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from pecei.action import CompileError
 
-from ..prompt import PLAN_TOOL_DESCRIPTION, PROGRAM_SCHEMA, SYSTEM_PROMPT, render_user
+from ..prompt import PLAN_TOOL_DESCRIPTION, PROGRAM_SCHEMA, load_system_prompt, render_user
 from ..protocol import Directive, TurnInput, TurnOutput, parse_program
 
 DEFAULT_MODEL = "gpt-4o-mini"
@@ -40,7 +40,7 @@ class OpenAIProvider:
             "model": self.model,
             "max_tokens": self.max_tokens,
             "messages": [
-                {"role": "system", "content": SYSTEM_PROMPT},
+                {"role": "system", "content": load_system_prompt()},
                 {"role": "user", "content": render_user(turn)},
             ],
             "tools": [tool],

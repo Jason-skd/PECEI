@@ -21,7 +21,7 @@ from pecei.action import BudgetExceeded, CompileError, Host, Interpreter, NavObs
 from pecei.engine import RoundEngine
 from pecei.infra import FailureSnapshot, Result, Trace, TraceEvent, build_report
 from pecei.llm import Directive, Feedback, LLMProvider, TurnInput
-from pecei.llm.prompt import SYSTEM_PROMPT, render_user
+from pecei.llm.prompt import load_system_prompt, render_user
 from pecei.observation import observe
 from pecei.world import ActionType, World, apply_action, load_world
 
@@ -112,7 +112,7 @@ def run_script(
     # Record exactly what the author was shown this cycle. The system prompt may
     # drift across versions, so capturing it per-cycle lets replay reproduce the
     # author's true context regardless of later edits to prompt.py.
-    prompt = {"system": SYSTEM_PROMPT, "user": render_user(turn)}
+    prompt = {"system": load_system_prompt(), "user": render_user(turn)}
     out = provider.decide(turn)                    # ONE LLM request per cycle
     program = out.program
     compile_error: str | None = out.error          # A-layer: malformed AST (parse failed)
