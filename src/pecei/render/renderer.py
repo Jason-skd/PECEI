@@ -20,11 +20,22 @@ from . import tiles
 
 
 class Renderer:
-    """Render ground-truth world state to a pygame.Surface."""
+    """Render ground-truth world state to a pygame.Surface.
 
-    def __init__(self, tile: int = tiles.TILE) -> None:
+    ``use_images=True`` + an assets dir swaps the flat color blocks for PNG tiles
+    (loaded once, scaled to the cell size); a missing tile falls back to the
+    color+shape block, so images are strictly optional.
+    """
+
+    def __init__(self, tile: int = tiles.TILE, use_images: bool = False,
+                 assets_dir: str | None = None) -> None:
         pygame.init()
         self.tile = tile
+        self.use_images = use_images
+        self._tiles: dict = {}
+        if use_images:
+            from pecei.replay.assets import load_tiles
+            self._tiles = load_tiles(tile, assets_dir)
 
     def render(
         self,
@@ -61,13 +72,17 @@ class Renderer:
         for y in range(grid.height + 1):
             pygame.draw.line(surf, tiles.GRID_LINE, (0, y * self.tile), (w, y * self.tile))
 
-        # goal marker (green ring)
+        # goal marker (image if available, else green ring)
         if goal is not None:
             gx, gy = goal
             if grid.in_bounds(gx, gy):
-                cx = gx * self.tile + self.tile // 2
-                cy = gy * self.tile + self.tile // 2
-                pygame.draw.circle(surf, tiles.GOAL, (cx, cy), self.tile // 2 - 3, 3)
+                img = self._tiles.get("goal")
+                if img is not None:
+                    surf.blit(img, (gx * self.tile, gy * self.tile))
+                else:
+                    cx = gx * self.tile + self.tile // 2
+                    cy = gy * self.tile + self.tile // 2
+                    pygame.draw.circle(surf, tiles.GOAL, (cx, cy), self.tile // 2 - 3, 3)
 
         return surf
 
@@ -75,6 +90,12 @@ class Renderer:
         self, surf: pygame.Surface, x: int, y: int, ctype: ComponentType, stacked: bool
     ) -> None:
         t = self.tile
+        img = self._tiles.get(ctype.value)
+        if img is not None:
+            surf.blit(img, (x * t, y * t))
+            if stacked:
+                pygame.draw.circle(surf, tiles.STACK_DOT, (x * t + t - 7, y * t + 7), 3)
+            return
         inset = 4
         rect = pygame.Rect(x * t + inset, y * t + inset, t - 2 * inset, t - 2 * inset)
         color = tiles.COLOR[ctype]
