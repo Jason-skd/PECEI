@@ -71,3 +71,14 @@ def test_prompt_roundtrips_through_session_json(tmp_path):
     s.save(out)
     s2 = Session.load(out)
     assert s2.cycles[0].prompt == {"system": "SYS", "user": "USR"}
+
+
+def test_yielded_observations_flow_into_next_cycle_feedback(tmp_path):
+    # End-to-end feedback channel: a cycle's beat(YIELD) observations must be
+    # recoverable from its written trace by last_feedback(), so the next cycle's
+    # author actually sees them. Regression: this channel was silently empty.
+    s = Session(map=str(EXAMPLE02), provider="mock", round_budget=50)
+    s.run_one_cycle(MockProvider(), trace_dir=str(tmp_path / "traces"))
+    fb = s.last_feedback()
+    assert fb is not None
+    assert len(fb.yielded) == 1

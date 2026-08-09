@@ -110,3 +110,12 @@ def test_trace_carries_program():
     assert r.trace.events
     assert r.trace.events[0].program and "act(FORWARD)" in r.trace.events[0].program
     assert world_at_step(str(EXAMPLE02), r.trace, 3).ego.anchor == (6, 2)
+
+
+def test_trace_records_yielded():
+    # The mock program beat(YIELD)s exactly one observation. It must land in the
+    # trace so Session.last_feedback() can recover it across cycles (regression:
+    # the yielded list was once collected but never written to the trace).
+    r = run_script(str(EXAMPLE02), MockProvider(), round_budget=50)
+    yielded_in_trace = [y for ev in r.trace.events for y in ev.yielded]
+    assert len(yielded_in_trace) == 1

@@ -149,6 +149,10 @@ def run_script(
         trace.events[0].program = program_str or None
         trace.events[0].llm_request = out.raw_request
         trace.events[0].llm_response = out.raw_response
+        # Persist what the script beat(YIELD)'d onto the trace so the next cycle's
+        # Session.last_feedback() -> _trace_yielded() recovers them (the yielded
+        # list is otherwise local-only and lost between cycles).
+        trace.events[-1].yielded = list(yielded)
 
     return ScriptRun(
         program=program_str,
