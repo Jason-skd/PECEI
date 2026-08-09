@@ -1,0 +1,13 @@
+# 01 corridor — baseline solvability. 10x6. ego(1,2)EAST -> goal(8,2). Straight east, no obstacles.
+width: 10
+height: 6
+goal: [8, 2]
+entities:
+  - name: ego
+    anchor: [3, 2]
+    orientation: EAST
+    is_ego: true
+    components:
+      - { offset: [0, 0], type: wheel }
+      - { offset: [0, 1], type: metal }
+      - { offset: [0, 2], type: brain }

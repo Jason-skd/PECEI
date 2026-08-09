@@ -1,0 +1,20 @@
+# 02 one wall — detour. 10x6. ego(1,3)EAST -> goal(8,2). Stone wall column blocks the
+# east row; go around the top. Fires the branch/turning path.
+width: 10
+height: 6
+goal: [8, 2]
+entities:
+  - name: ego
+    anchor: [3, 3]
+    orientation: EAST
+    is_ego: true
+    components:
+      - { offset: [0, 0], type: wheel }
+      - { offset: [0, 1], type: metal }
+      - { offset: [0, 2], type: brain }
+  - name: wall
+    anchor: [5, 2]
+    components:
+      - { offset: [0, 0], type: stone }
+      - { offset: [0, 1], type: stone }
+      - { offset: [0, 2], type: stone }
