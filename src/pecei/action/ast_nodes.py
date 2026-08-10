@@ -97,14 +97,37 @@ class If(BaseModel):
     orelse: list["Stmt"] = []
 
 
+class While(BaseModel):
+    # Same constraint as ``If``: ``test`` is a bool *variable name* (string),
+    # never an expression node — so the schema itself forbids ``while <expr>``.
+    # The interpreter re-reads the named variable before each iteration, so a
+    # loop that re-senses (``beat(OBSERVE)``) and re-assigns the predicate each
+    # pass runs blind until the world or the step budget stops it.
+    kind: Literal["while"] = "while"
+    test: str
+    body: list["Stmt"] = []
+
+
+class For(BaseModel):
+    # Bounded repetition: ``count`` is an int-valued expression evaluated ONCE
+    # before the loop (the iteration bound cannot change mid-loop). ``var``, if
+    # given, binds the 0-based iteration index (an int) inside the body —
+    # flat-scoped like the rest of the language (it leaks after the loop, same
+    # as a variable assigned inside an ``If``). The step budget caps the total.
+    kind: Literal["for"] = "for"
+    count: "Expr"
+    var: str | None = None
+    body: list["Stmt"] = []
+
+
 class ExprStmt(BaseModel):
     kind: Literal["expr"] = "expr"
     expr: Expr
 
 
-Stmt = Annotated[Union[Assign, If, ExprStmt], Field(discriminator="kind")]
+Stmt = Annotated[Union[Assign, If, While, For, ExprStmt], Field(discriminator="kind")]
 
-for _m in (Assign, If, ExprStmt):
+for _m in (Assign, If, While, For, ExprStmt):
     _m.model_rebuild()
 
 

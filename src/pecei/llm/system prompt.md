@@ -19,6 +19,8 @@ Minimal language:
   beat(YIELD, ob)                             # report an observation (fed back to you)
   b = ob.front.is_blocked                     # bool predicate
   if <bool_var>: ... else: ...                # condition MUST be a bare bool variable
+  while <bool_var>: ...                       # repeat while a bool var is True; re-sense in the body
+  for i in range(<int>): ...                  # bounded repeat; <int> is a literal/int var; index var optional
 
 Cell predicates (relative to facing: front/left/right/back/here):
   is_fire is_water is_stone is_wood is_metal is_wheel is_brain is_empty is_blocked is_goal

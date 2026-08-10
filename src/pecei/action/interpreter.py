@@ -2,8 +2,8 @@
 
 ``act``/``beat`` are NOT imported from the engine — they are injected via
 :class:`Host` (dependency inversion), so this module depends on world/observation
-types only, never on engine. A step budget bounds execution (defense in depth,
-even though the minimal DSL has no loops).
+types only, never on engine. A step budget bounds execution (defense in depth —
+the backstop that lets ``while``/``for`` loop without risking an infinite loop).
 """
 from __future__ import annotations
 
@@ -22,10 +22,12 @@ from .ast_nodes import (
     BeatOp,
     Compare,
     ExprStmt,
+    For,
     If,
     Lit,
     Program,
     Var,
+    While,
 )
 from .typecheck import type_check
 from .views import NavObs
@@ -73,6 +75,23 @@ class Interpreter:
         elif isinstance(s, If):
             for c in (s.then if env.get(s.test) else s.orelse):
                 self._exec(c, env)
+        elif isinstance(s, While):
+            # Re-read the named bool variable before every iteration: a body that
+            # re-senses (beat(OBSERVE)) and re-assigns the predicate advances the
+            # blind run. A per-iteration _tick bounds the total even when the
+            # body is empty (so an unchanging predicate cannot hang forever).
+            while env.get(s.test):
+                self._tick()
+                for c in s.body:
+                    self._exec(c, env)
+        elif isinstance(s, For):
+            n = self._eval(s.count, env)  # type-checked int; evaluated once
+            for i in range(n):
+                self._tick()  # bounds a huge count even with an empty body
+                if s.var is not None:
+                    env[s.var] = i
+                for c in s.body:
+                    self._exec(c, env)
         elif isinstance(s, ExprStmt):
             self._eval(s.expr, env)
 

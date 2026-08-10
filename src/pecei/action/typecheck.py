@@ -18,10 +18,12 @@ from .ast_nodes import (
     BeatOp,
     Compare,
     ExprStmt,
+    For,
     If,
     Lit,
     Program,
     Var,
+    While,
 )
 
 
@@ -43,6 +45,18 @@ def type_check(program: Program) -> None:
         _stmt(stmt, env)
 
 
+def _check_bool_condition(kw: str, test: str, env: dict[str, str]) -> None:
+    """The shared ``if``/``while`` rule: ``test`` names a defined **bool** variable.
+
+    The schema already made it a bare name (not an expression); this additionally
+    guarantees the named variable exists and is bool-typed.
+    """
+    if test not in env:
+        raise CompileError(f"{kw} condition references undefined variable {test!r}")
+    if env[test] != "bool":
+        raise CompileError(f"{kw} condition must be a bool variable; {test!r} is {env[test]}")
+
+
 def _stmt(s, env: dict[str, str]) -> None:
     if isinstance(s, Assign):
         if isinstance(s.expr, Beat) and s.expr.op is BeatOp.OBSERVE:
@@ -50,13 +64,21 @@ def _stmt(s, env: dict[str, str]) -> None:
         else:
             env[s.name] = _expr(s.expr, env)
     elif isinstance(s, If):
-        if s.test not in env:
-            raise CompileError(f"if condition references undefined variable {s.test!r}")
-        if env[s.test] != "bool":
-            raise CompileError(f"if condition must be a bool variable; {s.test!r} is {env[s.test]}")
+        _check_bool_condition("if", s.test, env)
         for c in s.then:
             _stmt(c, env)
         for c in s.orelse:
+            _stmt(c, env)
+    elif isinstance(s, While):
+        _check_bool_condition("while", s.test, env)
+        for c in s.body:
+            _stmt(c, env)
+    elif isinstance(s, For):
+        if _expr(s.count, env) != "int":
+            raise CompileError("for count must be an int expression")
+        if s.var is not None:
+            env[s.var] = "int"  # flat-scoped: visible (and leaks) like any assign
+        for c in s.body:
             _stmt(c, env)
     elif isinstance(s, ExprStmt):
         _expr(s.expr, env)

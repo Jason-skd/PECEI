@@ -14,10 +14,12 @@ from .ast_nodes import (
     BeatOp,
     Compare,
     ExprStmt,
+    For,
     If,
     Lit,
     Program,
     Var,
+    While,
 )
 from .interpreter import BudgetExceeded, Host, Interpreter
 from .pretty import pretty
@@ -26,7 +28,7 @@ from .views import NavCell, NavObs
 
 __all__ = [
     "Act", "Assign", "Attr", "Beat", "BeatOp", "BoolOp", "BudgetExceeded",
-    "CELL_BOOLS", "CELL_STR", "CompileError", "Compare", "ExprStmt", "Host",
-    "If", "Interpreter", "Lit", "NavCell", "NavObs", "OBS_DIRS", "Program",
-    "Var", "pretty", "type_check",
+    "CELL_BOOLS", "CELL_STR", "CompileError", "Compare", "ExprStmt", "For",
+    "Host", "If", "Interpreter", "Lit", "NavCell", "NavObs", "OBS_DIRS",
+    "Program", "Var", "While", "pretty", "type_check",
 ]

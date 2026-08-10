@@ -10,9 +10,11 @@ from pecei.action import (
     Beat,
     BeatOp,
     BoolOp,
+    BudgetExceeded,
     Compare,
     CompileError,
     ExprStmt,
+    For,
     Host,
     If,
     Interpreter,
@@ -20,6 +22,7 @@ from pecei.action import (
     NavObs,
     Program,
     Var,
+    While,
     pretty,
     type_check,
 )
@@ -167,3 +170,139 @@ def test_pretty_renders_text_dsl():
     assert "ob = beat(OBSERVE)" in text
     assert "if blocked:" in text
     assert "act(FORWARD)" in text
+
+
+# ---------- loops ----------
+
+def _eye_east(width, anchor=(2, 2), wall=None, height=5):
+    """ego (wheel/metal/brain) facing EAST at ``anchor`` in an empty width×height
+    world; a stone wall is placed at ``wall`` when given. Anchor defaults to
+    (2,2): the creature's local frame sits components two cells west of the
+    anchor, so x>=2 keeps every cell in bounds."""
+    w = World.empty(width, height)
+    w.add(Entity(eid="ego",
+                 components={(0, 0): Component.of("wheel"),
+                             (0, 1): Component.of("metal"),
+                             (0, 2): Component.of("brain")},
+                 anchor=anchor, orientation=Direction.EAST, is_ego=True))
+    if wall is not None:
+        w.add(Entity(eid="wall", components={(0, 0): Component.of("stone")}, anchor=wall))
+    return w
+
+
+def _while_until_blocked_program():
+    """clear = True; while clear: forward, re-observe, re-check front clear.
+
+    Walks east until the front cell is no longer empty (a wall)."""
+    return Program(body=[
+        Assign(name="ob", expr=Beat(op=BeatOp.OBSERVE)),
+        Assign(name="clear", expr=Attr(obj=Attr(obj=Var(name="ob"), attr="front"), attr="is_empty")),
+        While(test="clear", body=[
+            ExprStmt(expr=Act(action=ActionType.FORWARD)),
+            Assign(name="ob", expr=Beat(op=BeatOp.OBSERVE)),
+            Assign(name="clear", expr=Attr(obj=Attr(obj=Var(name="ob"), attr="front"), attr="is_empty")),
+        ]),
+    ])
+
+
+def test_while_advances_until_front_blocked():
+    world = _eye_east(8, wall=(7, 2))   # cells (3,2)..(6,2) clear, (7,2) wall
+    eng, host, _ = _make_host(world, "ego")
+    ego = world.ego
+    Interpreter(host).run(_while_until_blocked_program())
+    assert ego.anchor == (6, 2)         # stopped one short of the wall (4 forwards)
+
+
+def test_while_skips_body_when_predicate_false():
+    world = _eye_east(8, wall=(3, 2))   # wall immediately ahead of the anchor
+    eng, host, _ = _make_host(world, "ego")
+    ego = world.ego
+    Interpreter(host).run(_while_until_blocked_program())
+    assert ego.anchor == (2, 2)         # never entered the loop
+
+
+def test_for_loop_runs_count_times():
+    world = _eye_east(8)
+    eng, host, _ = _make_host(world, "ego")
+    ego = world.ego
+    prog = Program(body=[
+        For(count=Lit(value=3), body=[ExprStmt(expr=Act(action=ActionType.FORWARD))]),
+    ])
+    Interpreter(host).run(prog)
+    assert ego.anchor == (5, 2)         # 2 + 3 forwards
+
+
+def test_for_loop_binds_index_variable():
+    # for i in range(2): forward  -> index leaks as int after the loop; we use it
+    # in a compare to prove the var is bound and int-valued in (and after) the body.
+    world = _eye_east(8)
+    eng, host, _ = _make_host(world, "ego")
+    ego = world.ego
+    prog = Program(body=[
+        For(var="i", count=Lit(value=2), body=[
+            ExprStmt(expr=Act(action=ActionType.FORWARD)),
+        ]),
+        # after the loop i == 1 (last index); compare it to prove it survived as int
+        Assign(name="done", expr=Compare(op="==", left=Var(name="i"), right=Lit(value=1))),
+    ])
+    Interpreter(host).run(prog)         # should not raise; ego advanced 2
+    assert ego.anchor == (4, 2)
+
+
+def test_while_test_must_be_bool_variable():
+    bad = Program(body=[
+        Assign(name="ob", expr=Beat(op=BeatOp.OBSERVE)),
+        While(test="ob", body=[]),      # ob is obs, not bool
+    ])
+    with pytest.raises(CompileError):
+        type_check(bad)
+
+
+def test_while_test_undefined_variable():
+    with pytest.raises(CompileError):
+        type_check(Program(body=[While(test="missing", body=[])]))
+
+
+def test_for_count_must_be_int():
+    bad = Program(body=[
+        Assign(name="ob", expr=Beat(op=BeatOp.OBSERVE)),
+        # a bool predicate is not a valid count
+        For(count=Attr(obj=Attr(obj=Var(name="ob"), attr="front"), attr="is_blocked"),
+            body=[]),
+    ])
+    with pytest.raises(CompileError):
+        type_check(bad)
+
+
+def test_for_var_is_int_in_body():
+    prog = Program(body=[
+        For(var="i", count=Lit(value=3), body=[
+            Assign(name="last", expr=Var(name="i")),
+        ]),
+    ])
+    type_check(prog)                    # body sees i as int -> no error
+
+
+def test_infinite_while_hits_step_budget():
+    world = _eye_east(8)
+    eng, host, _ = _make_host(world, "ego", budget=50)
+    prog = Program(body=[
+        Assign(name="on", expr=Lit(value=True)),
+        While(test="on", body=[]),      # predicate never flips -> bounded by budget
+    ])
+    with pytest.raises(BudgetExceeded):
+        Interpreter(host).run(prog)
+
+
+def test_pretty_renders_loops():
+    prog = Program(body=[
+        Assign(name="ob", expr=Beat(op=BeatOp.OBSERVE)),
+        While(test="clear", body=[ExprStmt(expr=Act(action=ActionType.FORWARD))]),
+        For(var="i", count=Lit(value=4), body=[ExprStmt(expr=Act(action=ActionType.TURNLEFT))]),
+        For(count=Lit(value=2), body=[]),  # no index var -> rendered as `_`
+    ])
+    text = pretty(prog)
+    assert "while clear:" in text
+    assert "for i in range(4):" in text
+    assert "for _ in range(2):" in text
+    assert "pass" in text                 # empty for body renders a pass

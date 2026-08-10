@@ -15,10 +15,12 @@ from .ast_nodes import (
     BeatOp,
     Compare,
     ExprStmt,
+    For,
     If,
     Lit,
     Program,
     Var,
+    While,
 )
 
 
@@ -40,6 +42,15 @@ def _stmt(s, n: int) -> str:
         if s.orelse:
             out.append(f"{pad}else:")
             out.extend([_stmt(c, n + 1) for c in s.orelse] or [f"{_indent(n + 1)}pass"])
+        return "\n".join(out)
+    if isinstance(s, While):
+        out = [f"{pad}while {s.test}:"]
+        out.extend([_stmt(c, n + 1) for c in s.body] or [f"{_indent(n + 1)}pass"])
+        return "\n".join(out)
+    if isinstance(s, For):
+        var = s.var if s.var is not None else "_"
+        out = [f"{pad}for {var} in range({_expr(s.count)}):"]
+        out.extend([_stmt(c, n + 1) for c in s.body] or [f"{_indent(n + 1)}pass"])
         return "\n".join(out)
     if isinstance(s, ExprStmt):
         return f"{pad}{_expr(s.expr)}"

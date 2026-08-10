@@ -27,6 +27,8 @@ PLAN_TOOL_DESCRIPTION = (
     "  beat(YIELD, ob)                           # report an observation (fed back to you)\n"
     "  b = ob.front.is_blocked                   # bool predicate\n"
     "  if <bool_var>: ... else: ...              # condition MUST be a bare bool variable\n"
+    "  while <bool_var>: ...                     # repeat while a bool var is True; re-sense in the body\n"
+    "  for i in range(<int>): ...                # bounded repeat; <int> is a literal/int var; index var optional\n"
     "TWO VERBS, never mix their arguments: `act` takes ONLY a movement "
     "(FORWARD/BACKWARD/TURNLEFT/TURNRIGHT); `beat` takes ONLY OBSERVE or YIELD. "
     "So `act(YIELD)` and `beat(FORWARD)` are ALWAYS wrong. RULE: an if-condition "
