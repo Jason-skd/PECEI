@@ -13,7 +13,7 @@ from __future__ import annotations
 from enum import Enum
 from typing import Annotated, Any, Literal, Union
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from pecei.world.actions import ActionType
 
@@ -41,10 +41,29 @@ class At(BaseModel):
     # whose ``is_X`` predicates / ``ctype`` can then be read. dx/dy are int
     # expressions in canonical offsets (+x = the observer's gaze; (0,0) = self).
     # Unseen offsets yield an empty cell, so every predicate is safe.
+    #
+    # Schema aligns to the taught surface syntax: the model naturally writes
+    # ``ob.at(5, 0)`` with a bare int offset and a bare ``ob`` variable name, so
+    # a bare int offset is read as ``Lit(int)`` and a bare string ``obj`` is read
+    # as ``Var(str)`` — no nested ``{"kind":...}`` wrappers required.
     kind: Literal["at"] = "at"
     obj: "Expr"
     dx: "Expr"
     dy: "Expr"
+
+    @field_validator("obj", mode="before")
+    @classmethod
+    def _coerce_obj(cls, v: Any) -> Any:
+        if isinstance(v, str):
+            return {"kind": "var", "name": v}
+        return v
+
+    @field_validator("dx", "dy", mode="before")
+    @classmethod
+    def _coerce_offset(cls, v: Any) -> Any:
+        if isinstance(v, int) and not isinstance(v, bool):
+            return {"kind": "lit", "value": v}
+        return v
 
 
 class Compare(BaseModel):
@@ -56,7 +75,7 @@ class Compare(BaseModel):
 
 class BoolOp(BaseModel):
     kind: Literal["boolop"] = "boolop"
-    op: Literal["and", "or"]
+    op: Literal["and", "or", "not"]
     operands: list["Expr"]
 
 

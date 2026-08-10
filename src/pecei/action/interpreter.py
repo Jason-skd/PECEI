@@ -119,6 +119,8 @@ class Interpreter:
         if isinstance(e, Compare):
             return _OPS[e.op](self._eval(e.left, env), self._eval(e.right, env))
         if isinstance(e, BoolOp):
+            if e.op == "not":
+                return not self._eval(e.operands[0], env)
             if e.op == "and":
                 for o in e.operands:
                     if not self._eval(o, env):

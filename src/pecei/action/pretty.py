@@ -70,6 +70,8 @@ def _expr(e) -> str:
     if isinstance(e, Compare):
         return f"{_expr(e.left)} {e.op} {_expr(e.right)}"
     if isinstance(e, BoolOp):
+        if e.op == "not":
+            return f"not {_expr(e.operands[0])}"
         joiner = " and " if e.op == "and" else " or "
         return joiner.join(_expr(o) for o in e.operands)
     if isinstance(e, Act):

@@ -125,6 +125,8 @@ def _expr(e, env: dict[str, str]) -> str:
         _expr(e.right, env)
         return "bool"
     if isinstance(e, BoolOp):
+        if e.op == "not" and len(e.operands) != 1:
+            raise CompileError("not takes exactly one operand")
         for o in e.operands:
             if _expr(o, env) != "bool":
                 raise CompileError("bool operator requires bool operands")

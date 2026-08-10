@@ -168,6 +168,25 @@ def test_json_schema_generated():
     assert "properties" in schema or "$defs" in schema
 
 
+def test_at_coerces_bare_int_offsets_and_bare_string_obj():
+    # The taught surface syntax is `ob.at(5, 0)`; the model often emits bare
+    # ints/strings instead of nested {kind:lit/var} wrappers. At must coerce:
+    # bare int offset -> Lit, bare string obj -> Var. Regression for the
+    # 01_corridor run where these caused 3 COMPILE_ERRORs.
+    from pecei.llm.protocol import parse_program
+    prog = parse_program({"body": [
+        {"kind": "assign", "name": "ob", "expr": {"kind": "beat", "op": "OBSERVE"}},
+        {"kind": "assign", "name": "c", "expr": {"kind": "at", "obj": "ob", "dx": 5, "dy": 0}},
+        {"kind": "assign", "name": "b", "expr": {"kind": "attr", "obj": {"kind": "var", "name": "c"}, "attr": "is_goal"}},
+    ]})
+    assert prog is not None
+    at_node = prog.body[1].expr
+    assert at_node.obj.name == "ob"           # bare "ob" coerced to Var
+    assert at_node.dx.value == 5 and at_node.dx.kind == "lit"
+    assert at_node.dy.value == 0 and at_node.dy.kind == "lit"
+    type_check(prog)                            # coerced form type-checks (obs/int -> cell -> bool)
+
+
 def test_pretty_renders_text_dsl():
     prog = Program(body=[
         Assign(name="ob", expr=Beat(op=BeatOp.OBSERVE)),

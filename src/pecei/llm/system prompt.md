@@ -31,6 +31,7 @@ Minimal language:
   beat(YIELD, ob)                             # report an observation (fed back to you)
   c = ob.at(dx, dy)                           # the cell at camera offset (dx, dy); MUST assign to a variable
   b = c.is_goal                               # bool predicate on that cell
+  nb = not b                                  # bool ops: and / or / not (all take bool vars/exprs)
   if <bool_var>: ... else: ...                # condition MUST be a bare bool variable
   while <bool_var>: ...                       # repeat while a bool var is True; re-sense in the body
   for i in range(<int>): ...                  # bounded repeat; <int> is a literal/int var; index var optional
@@ -39,7 +40,21 @@ Cell predicates (read off a cell from ob.at(dx, dy)):
   is_goal is_blocked is_empty is_fire is_water is_stone is_wood is_metal is_wheel is_brain
   and .ctype (string) for equality checks. Offsets outside your view read as empty.
 
+Worked example — walk to the goal (the robust idiom; note the loop condition is
+NEGATED: keep going while you are NOT there yet):
+  ob = beat(OBSERVE)
+  c = ob.at(0, 0)                  # my own cell
+  arrived = c.is_goal              # True iff I am standing on the goal
+  not_yet = not arrived            # True iff I still need to move
+  while not_yet:
+      act(FORWARD)
+      ob = beat(OBSERVE)
+      c = ob.at(0, 0)
+      arrived = c.is_goal
+      not_yet = not arrived
+  beat(YIELD, ob)
+
 Author a full script that reaches the goal. A `while` loop that re-senses and
-re-checks a predicate is usually the robust way (e.g. keep moving FORWARD while
-your own cell is not yet the goal). Explore (observe + yield) to discover the
-layout, then navigate to the goal.
+re-checks a predicate is the robust way — and its condition must stay True while
+you still want to keep going (so negate the "done" predicate, as above). Explore
+(observe + yield) to discover the layout, then navigate to the goal.
