@@ -25,6 +25,7 @@ class ComponentType(str, Enum):
     BRAIN = "brain"
     METAL = "metal"
     GOAL = "goal"
+    BOUNDARY = "boundary"
 
 
 # Per-type default attributes. Keys are the loose trait/state names from the
@@ -42,19 +43,23 @@ _DEFAULT_ATTRS: dict[ComponentType, dict[str, Any]] = {
     # can perceive it through the same ctype channel as any other component, but
     # it has no weight and never blocks movement (it is NOT in Grid._SOLID).
     ComponentType.GOAL: {"weight": 0.0, "buoyancy": 0.0, "burn": False, "wet": False, "fireproof": True},
+    ComponentType.BOUNDARY: {"weight": 0.0, "buoyancy": 0.0, "burn": False, "wet": False, "fireproof": True},
 }
 
 
 # Component types that physically block movement. The single source of truth —
 # shared by Grid.is_blocked (collision) and CellView.is_blocked (perception) so
 # the agent's predicate can never disagree with the world. Liquids (water) and
-# fire are non-blocking terrain; GOAL is a non-physical marker.
+# fire are non-blocking terrain; GOAL is a non-physical marker. BOUNDARY is the
+# perceived map edge (it never occupies a real cell — only the observation layer
+# emits it), and it blocks: the agent must treat the edge as impassable.
 SOLID: frozenset[ComponentType] = frozenset({
     ComponentType.STONE,
     ComponentType.METAL,
     ComponentType.WOOD,
     ComponentType.WHEEL,
     ComponentType.BRAIN,
+    ComponentType.BOUNDARY,
 })
 
 

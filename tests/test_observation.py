@@ -102,3 +102,25 @@ def test_at_unseen_offset_returns_empty_cell():
     unseen = obs.at(0, -1)
     assert unseen is not None
     assert unseen.is_empty and not unseen.is_blocked and not unseen.is_goal
+
+
+def test_map_edge_visible_as_boundary():
+    # An eye at the bottom edge facing SOUTH must SEE the edge as a boundary
+    # cell (is_blocked=True), not as empty — otherwise it walks into the edge
+    # forever. Regression for the 02_one_wall boundary-stuck loops.
+    from pecei.world.component import ComponentType
+    world = World.empty(5, 5)
+    world.add(
+        Entity(
+            eid="eye",
+            components={(0, 0): Component.of("brain")},
+            anchor=(2, 4),                 # bottom row
+            orientation=Direction.SOUTH,   # gaze points off the map
+            is_ego=True,
+        )
+    )
+    obs = observe(world, "eye", vision_range=3, half_angle=45)
+    ahead = obs.at(1, 0)                   # canonical forward = one step south = OOB
+    assert ComponentType.BOUNDARY in ahead.ctypes
+    assert ahead.is_blocked                # the agent can see the edge blocks it
+    assert ahead.ctype == "boundary"

@@ -49,8 +49,11 @@ for i in range(<int>): ...                  # bounded repeat; <int> literal or i
 
 ### 3.3 Cell predicates (on a cell from `ob.at(dx, dy)`)
 `is_goal` `is_blocked` `is_empty` `is_fire` `is_water` `is_stone` `is_wood`
-`is_metal` `is_wheel` `is_brain`, and `.ctype` (string). **Offsets outside your
-view read as empty** (you cannot see the map edge as blocked).
+`is_metal` `is_wheel` `is_brain`, and `.ctype` (string).
+
+- A cell of type `boundary` is the **map edge** — it is blocked, you cannot walk
+  past it. Sense it and turn away (treat it like a wall).
+- Offsets outside your view (behind you, beyond range) read as empty.
 
 ## 4. Worked example — walk to the goal
 

@@ -119,6 +119,14 @@ def _empty_cell() -> CellView:
     return _EMPTY_CELL
 
 
+# The perceived map edge: an OOB cell within the FOV cone (and not occluded) is
+# shown as a BOUNDARY cell. It is solid (in component.SOLID) so is_blocked is
+# True — the agent can see the edge and turn away from it, instead of walking
+# into it forever. Like GOAL it is a perception-layer marker; it never occupies a
+# real grid cell, so the renderer / grid know nothing about it.
+_BOUNDARY_CELL = CellView(ctypes=(ComponentType.BOUNDARY,), eids=())
+
+
 def observe(
     world: World,
     observer_eid: str,
@@ -128,9 +136,11 @@ def observe(
 ) -> Observation:
     """Build an egocentric Observation for ``observer_eid``.
 
-    FOV cone is computed in world space (pointed along the entity's facing), then
-    every visible offset is rotated into the canonical camera frame (+x = gaze).
-    The observer always perceives its own body.
+    Enumerates the FOV cone (Chebyshev range + half-angle, world-aligned to the
+    facing) offset by offset. Each in-bounds cell with clear line of sight is
+    perceived via its occupants; each OUT-OF-BOUNDS cell with clear line of sight
+    is perceived as a BOUNDARY. Every offset is then rotated into the canonical
+    camera frame (+x = gaze). The observer always perceives its own body.
     """
     ent = world.entity(observer_eid)
     ox, oy = ent.anchor
@@ -143,11 +153,25 @@ def observe(
 
     steps = _CANONICAL_STEPS[ent.orientation]
     grid = world.grid
-    visible = _visible_cells(grid, (ox, oy), ent.orientation, rng, ha)
+    origin = (ox, oy)
 
     cells: dict[tuple[int, int], CellView] = {}
-    for (x, y) in visible:
-        cells[_rotate((x - ox, y - oy), steps)] = _view(grid, x, y)
+    for dy in range(-rng, rng + 1):
+        for dx in range(-rng, rng + 1):
+            if dx == 0 and dy == 0:
+                continue
+            if max(abs(dx), abs(dy)) > rng:
+                continue
+            if not _in_cone((dx, dy), ent.orientation, ha):
+                continue
+            target = (ox + dx, oy + dy)
+            if not _line_of_sight(grid, origin, target):
+                continue  # occluded by a solid cell on the way
+            if grid.in_bounds(*target):
+                cells[_rotate((dx, dy), steps)] = _view(grid, *target)
+            else:
+                cells[_rotate((dx, dy), steps)] = _BOUNDARY_CELL
+
     # the observer always perceives its own body, even outside the cone
     for (x, y) in ent.placements():
         cells.setdefault(_rotate((x - ox, y - oy), steps), _view(grid, x, y))
@@ -161,24 +185,6 @@ def _view(grid: Grid, x: int, y: int) -> CellView:
         ctypes=tuple(o.component.ctype for o in occs),
         eids=tuple(o.eid for o in occs),
     )
-
-
-def _visible_cells(
-    grid: Grid, origin: tuple[int, int], facing: Direction, rng: int, half_angle: float
-) -> set[tuple[int, int]]:
-    ox, oy = origin
-    out: set[tuple[int, int]] = {origin}
-    for (x, y, _occs) in grid.cells():
-        if (x, y) == origin:
-            continue
-        dx, dy = x - ox, y - oy
-        if max(abs(dx), abs(dy)) > rng:
-            continue
-        if not _in_cone((dx, dy), facing, half_angle):
-            continue
-        if _line_of_sight(grid, origin, (x, y)):
-            out.add((x, y))
-    return out
 
 
 def _in_cone(v: tuple[int, int], facing: Direction, half_angle: float) -> bool:
