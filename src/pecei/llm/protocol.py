@@ -7,9 +7,10 @@ chose to ``beat(YIELD)`` + the stop-report) returned and fed into the next cycle
 """
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Protocol, runtime_checkable
+from typing import Any, Protocol, runtime_checkable
 
 from pydantic import ValidationError
 
@@ -67,20 +68,152 @@ class LLMProvider(Protocol):
 def parse_program(payload: dict | str) -> Program:
     """Validate an LLM tool-call ``payload`` into a Program.
 
-    Raises :class:`CompileError` (carrying a human-readable location) if the AST
-    is malformed — e.g. ``act(YIELD)`` (conflating ``beat(YIELD, ...)`` with
-    ``act(FORWARD|...)``), a missing field, or a bad discriminator. The caller
-    (provider) catches this and surfaces it as ``TurnOutput.error`` so the runner
-    records the cycle as ``COMPILE_ERROR`` and feeds the message back to the
-    author. ``payload`` is a dict (Anthropic ``block.input``) or a JSON string
-    (OpenAI ``tool_call.function.arguments``).
+    The payload is first run through a LENIENT normaliser that repairs the shape
+    errors a model most often makes when writing the nested AST by hand
+    (see :func:`_normalize`); the strict pydantic AST then validates the
+    canonical form. Raises :class:`CompileError` (carrying a human-readable
+    location) if it is still malformed. The caller (provider) surfaces this as
+    ``TurnOutput.error`` so the runner records the cycle as ``COMPILE_ERROR`` and
+    feeds the message back to the author.
     """
     try:
-        if isinstance(payload, str):
-            return Program.model_validate_json(payload)
-        return Program.model_validate(payload)
+        data = json.loads(payload) if isinstance(payload, str) else payload
+        if isinstance(data, dict):
+            data = _normalize(data)
+        return Program.model_validate(data)
     except (ValidationError, ValueError) as e:  # ValueError covers malformed JSON
         raise CompileError(_format_payload_error(e)) from e
+
+
+# ---- lenient normalisation (schema aligns to the taught surface syntax) ----
+
+# Surface form -> canonical statement kind. The model writes `{"assign": {...}}`
+# or omits the `kind` tag entirely; the AST is a discriminated union that needs it.
+_STMT_KEYS = ("assign", "if", "while", "for", "expr")
+# Node kind inferred from a dict's own field(s), when the model omits `kind`.
+_EXPR_KIND_BY_KEY = {
+    "value": "lit", "name": "var", "attr": "attr", "at": "at", "op": None,
+    "action": "act", "left": "compare", "operands": "boolop", "obj": None,
+}
+_BOOL_OPS = {"and", "or", "not"}
+_BEAT_OPS = {"OBSERVE", "YIELD"}
+
+
+def _normalize(node: Any, *, in_body: bool = False) -> Any:
+    """Recursively repair common LLM AST-shape mistakes. Pure on dicts/lists.
+
+    ``in_body`` marks that this node is a direct element of a statement list
+    (Program.body, or the body/then/orelse of a compound statement) — the only
+    place where a bare act/beat must be wrapped in an ExprStmt.
+    """
+    if isinstance(node, list):
+        return [_normalize(n, in_body=True) for n in node]
+    if not isinstance(node, dict):
+        return node
+
+    # Single-key surface-statement wrapper: {"assign": {...}} -> {"kind":"assign", ...}.
+    # Only at statement position (in_body): in an expression position a dict like
+    # {"beat": {...}} is an expression wrapper handled by _infer_expr_kind, not a
+    # statement wrapper. The wrapper's value may itself be wrapper-style (e.g.
+    # {"assign": {"expr": {"beat": {...}}}}), so recurse into the merged result.
+    if in_body:
+        wrapped = None
+        for sk in _STMT_KEYS:
+            if sk in node and "kind" not in node:
+                inner = node[sk]
+                wrapped = {"kind": sk}
+                if sk == "expr":
+                    # ExprStmt wrapper: {"expr": <expression>} -> {"kind":"expr","expr":...}
+                    wrapped["expr"] = inner
+                elif isinstance(inner, dict):
+                    wrapped.update(inner)
+                break
+        if wrapped is not None:
+            return _normalize(wrapped, in_body=True)
+
+    if "body" in node and isinstance(node["body"], list):
+        node = {**node, "body": [_normalize(s, in_body=True) for s in node["body"]]}
+
+    # Fill a missing kind from the field signature. _infer_expr_kind mutates
+    # `node` in place (it promotes surface-wrapper inner fields up), so call it
+    # before spreading — otherwise the in-place promotion is lost on the copy.
+    if "kind" not in node:
+        if "test" in node and ("then" in node or "orelse" in node):
+            node["kind"] = "if"
+        elif "test" in node and "body" in node:
+            node["kind"] = "while"
+        elif "count" in node:
+            node["kind"] = "for"
+        elif "name" in node and "expr" in node:
+            node["kind"] = "assign"
+        else:
+            _infer_expr_kind(node)
+
+    kind = node.get("kind")
+
+    # A bare act/beat written directly in a statement list -> wrap in ExprStmt.
+    # (Only at body level: an act/beat that is the value of an `expr` field is
+    # already in the right place and must NOT be re-wrapped.)
+    if in_body and kind in ("act", "beat"):
+        node = {"kind": "expr", "expr": {k: v for k, v in node.items()}}
+
+    # Fill a missing beat op from its shape (YIELD takes a value, OBSERVE does not).
+    if kind == "beat" and "op" not in node:
+        node = {**node, "op": "YIELD" if node.get("value") is not None else "OBSERVE"}
+
+    # A condition given as {"kind":"var","name":x} -> the bare name string the
+    # schema wants for If.test / While.test.
+    if kind in ("if", "while") and isinstance(node.get("test"), dict) and node["test"].get("kind") == "var":
+        node = {**node, "test": node["test"]["name"]}
+
+    # Recurse into sub-expression / sub-statement fields (NOT in_body: these are
+    # expression positions, so a bare act/beat here stays as an expression).
+    out = dict(node)
+    for f in ("obj", "dx", "dy", "left", "right", "expr", "value", "count"):
+        if f in out and isinstance(out[f], (dict, list)):
+            out[f] = _normalize(out[f], in_body=False)
+    for f in ("operands",):
+        if f in out and isinstance(out[f], list):
+            out[f] = [_normalize(n, in_body=False) for n in out[f]]
+    for f in ("then", "orelse"):
+        if f in out and isinstance(out[f], list):
+            out[f] = [_normalize(n, in_body=True) for n in out[f]]
+    return out
+
+
+def _infer_expr_kind(node: dict) -> str:
+    """Guess an expression's kind from its field signature when `kind` is missing.
+
+    Handles two shapes: field-signature dicts ({op, attr, value, ...}) and
+    surface wrappers ({beat: {...}}, {at: {...}}, ...). The wrapper case promotes
+    the inner dict's fields up so the node becomes canonical.
+    """
+    # Surface wrappers: {"beat": {...}} / {"at": {...}} / {"attr": {...}} etc.
+    for key, kind in (("beat", "beat"), ("at", "at"), ("attr", "attr"),
+                      ("act", "act"), ("boolop", "boolop"), ("compare", "compare"),
+                      ("var", "var"), ("lit", "lit")):
+        if key in node and isinstance(node[key], dict):
+            inner = node.pop(key)
+            node.update(inner)
+            node["kind"] = kind
+            return kind
+    if "action" in node:
+        return "act"
+    if "op" in node:
+        op = node.get("op")
+        if op in _BEAT_OPS:
+            return "beat"
+        if op in _BOOL_OPS:
+            return "boolop"
+    if "left" in node or "right" in node:
+        return "compare"
+    if "operands" in node:
+        return "boolop"
+    if "value" in node:
+        return "lit"
+    if "name" in node:
+        return "var"
+    return "expr"
 
 
 def _format_payload_error(e: Exception) -> str:

@@ -35,6 +35,14 @@ class Attr(BaseModel):
     obj: "Expr"
     attr: str
 
+    @field_validator("obj", mode="before")
+    @classmethod
+    def _coerce_obj(cls, v: Any) -> Any:
+        # Surface syntax `c.is_goal` writes the object as a bare variable name.
+        if isinstance(v, str):
+            return {"kind": "var", "name": v}
+        return v
+
 
 class At(BaseModel):
     # Cell lookup in the egocentric camera frame: ``ob.at(dx, dy)`` -> a cell,
@@ -77,6 +85,14 @@ class BoolOp(BaseModel):
     kind: Literal["boolop"] = "boolop"
     op: Literal["and", "or", "not"]
     operands: list["Expr"]
+
+    @field_validator("operands", mode="before")
+    @classmethod
+    def _coerce_operands(cls, v: Any) -> Any:
+        # `not p` / `a and b` may be written with bare variable-name operands.
+        if isinstance(v, list):
+            return [{"kind": "var", "name": o} if isinstance(o, str) else o for o in v]
+        return v
 
 
 class Act(BaseModel):

@@ -1,60 +1,77 @@
-You author a policy script for a grid rescue agent. Each cycle you emit ONE
-complete script via the `plan` tool; it then runs autonomously from the start
-until it stops. You get NO live feedback while it runs. Your ultimate goal is to
-reach the `goal` cell.
+# Grid rescue agent — author policy
 
-You are blind to the live simulation AND to the full map. You are given NO
-absolute position, NO orientation, NO map coordinates — you can only reason from
-what your own camera sees. Each cycle you see only a PARTIAL seed observation of
-the view from your start pose (a 90° cone). To learn what lies beyond it, your
-scripts must beat(OBSERVE) and beat(YIELD) what they sense; whatever you yield is
-fed back next cycle, along with the stop-report (why it stopped: SUCCESS /
-COMPILE_ERROR / ROUND_LIMIT_EXCEED / ENERGY_RUN_OUT / SCRIPT_ENDED) and the
-previous script that produced it. COMPILE_ERROR means your script did not compile
-(illegal act/beat argument, undefined variable, non-bool if-condition, ...); the
-exact error is shown to you — fix it. SCRIPT_ENDED means it ran to completion
-with budget left but did not reach the goal. Use that feedback to write a better
-script next cycle.
+## 1. Goal & loop
 
-Your camera view is a set of cells, each described by a camera offset (dx, dy):
-  * (0, 0) is your own cell.
-  * +x is where you are looking (your gaze); moving FORWARD advances you +1 in x.
-  * +y is to one side. To look another way, act(TURNLEFT)/act(TURNRIGHT) (this
-    re-aims your gaze), then beat(OBSERVE) again to get a fresh view.
-Each cell lists the component types it contains, e.g. `2,0:goal`, `1,1:stone`.
-A cell with `goal` is the target — walk to it. There is no separate "goal
-coordinate"; the goal only exists when a `goal` cell is in your view.
+Each cycle you emit ONE complete script (the `plan` tool). It runs **blind** from
+the start until it stops — you get NO feedback while it runs. Your goal: reach the
+`goal` cell. After the script stops you learn why (`SUCCESS` / `COMPILE_ERROR` /
+`ROUND_LIMIT_EXCEED` / `SCRIPT_ENDED`) plus what your script yielded; use that to
+write a better script next cycle.
 
-Minimal language:
-  act(FORWARD|BACKWARD|TURNLEFT|TURNRIGHT)   # one round each — act takes ONLY a movement
-  ob = beat(OBSERVE)                          # sense now; MUST assign to a variable
-  beat(YIELD, ob)                             # report an observation (fed back to you)
-  c = ob.at(dx, dy)                           # the cell at camera offset (dx, dy); MUST assign to a variable
-  b = c.is_goal                               # bool predicate on that cell
-  nb = not b                                  # bool ops: and / or / not (all take bool vars/exprs)
-  if <bool_var>: ... else: ...                # condition MUST be a bare bool variable
-  while <bool_var>: ...                       # repeat while a bool var is True; re-sense in the body
-  for i in range(<int>): ...                  # bounded repeat; <int> is a literal/int var; index var optional
+- `COMPILE_ERROR`: your script was malformed; the exact error is shown — fix it.
+- `SCRIPT_ENDED`: ran out of statements with budget left, goal not reached.
+- `ROUND_LIMIT_EXCEED`: a loop never terminated (100 rounds) — your "keep going"
+  condition never became false; fix the stopping predicate.
 
-Cell predicates (read off a cell from ob.at(dx, dy)):
-  is_goal is_blocked is_empty is_fire is_water is_stone is_wood is_metal is_wheel is_brain
-  and .ctype (string) for equality checks. Offsets outside your view read as empty.
+## 2. What you can perceive
 
-Worked example — walk to the goal (the robust idiom; note the loop condition is
-NEGATED: keep going while you are NOT there yet):
-  ob = beat(OBSERVE)
-  c = ob.at(0, 0)                  # my own cell
-  arrived = c.is_goal              # True iff I am standing on the goal
-  not_yet = not arrived            # True iff I still need to move
-  while not_yet:
-      act(FORWARD)
-      ob = beat(OBSERVE)
-      c = ob.at(0, 0)
-      arrived = c.is_goal
-      not_yet = not arrived
-  beat(YIELD, ob)
+You get **no map, no coordinates, no compass** — only your own camera view: a set
+of cells at offsets `(dx, dy)`.
 
-Author a full script that reaches the goal. A `while` loop that re-senses and
-re-checks a predicate is the robust way — and its condition must stay True while
-you still want to keep going (so negate the "done" predicate, as above). Explore
-(observe + yield) to discover the layout, then navigate to the goal.
+- `(0, 0)` = your own cell. `+x` = where you look (your gaze); `FORWARD` moves
+  you +1 in `x`. `+y` = one side.
+- To look another way: `act(TURNLEFT)` / `act(TURNRIGHT)` re-aims your gaze, then
+  `beat(OBSERVE)` for a fresh view.
+- Each cell lists its component types, e.g. `2,0:goal`, `1,1:stone`. A `goal`
+  cell is the target — walk to it. You only see the goal when its cell is in view.
+
+## 3. Language
+
+### 3.1 Statements
+```
+act(FORWARD|BACKWARD|TURNLEFT|TURNRIGHT)   # one round; act takes ONLY a movement
+ob = beat(OBSERVE)                          # sense now; MUST assign to a variable
+beat(YIELD, ob)                             # report an observation (fed back next cycle)
+c = ob.at(dx, dy)                           # the cell at offset (dx,dy); MUST assign
+b = c.is_goal                               # a bool predicate; assign before use
+nb = not b                                  # bool ops: and / or / not
+if <bool_var>: ... else: ...                # condition is a bare bool VARIABLE
+while <bool_var>: ...                       # repeat while a bool var is True; re-sense in the body
+for i in range(<int>): ...                  # bounded repeat; <int> literal or int var
+```
+
+### 3.2 Rules
+- `if` / `while` take a **bool variable name** (string), never an expression —
+  compute any predicate into a bool variable first.
+- `beat(OBSERVE)` must be assigned before its cell's attributes are used.
+- `act` takes ONLY a movement; `beat` takes ONLY `OBSERVE`/`YIELD`. `act(YIELD)`
+  and `beat(FORWARD)` are always wrong.
+
+### 3.3 Cell predicates (on a cell from `ob.at(dx, dy)`)
+`is_goal` `is_blocked` `is_empty` `is_fire` `is_water` `is_stone` `is_wood`
+`is_metal` `is_wheel` `is_brain`, and `.ctype` (string). **Offsets outside your
+view read as empty** (you cannot see the map edge as blocked).
+
+## 4. Worked example — walk to the goal
+
+The robust idiom is a `while` loop that re-senses each step. Note the condition
+is **negated**: keep going while you are NOT there yet.
+
+```
+ob = beat(OBSERVE)
+c = ob.at(0, 0)          # my own cell
+arrived = c.is_goal
+not_yet = not arrived
+while not_yet:
+    act(FORWARD)
+    ob = beat(OBSERVE)
+    c = ob.at(0, 0)
+    arrived = c.is_goal
+    not_yet = not arrived
+beat(YIELD, ob)
+```
+
+To detour around an obstacle, sense the cell ahead and turn when blocked, e.g.
+`ahead = ob.at(1, 0); if ahead.is_blocked: act(TURNRIGHT) else: act(FORWARD)` —
+but remember a `while` loop must always be able to terminate (its predicate must
+eventually flip), or it hits the round limit.
