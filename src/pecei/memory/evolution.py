@@ -4,8 +4,8 @@ The agent's raw per-cycle memory used to be a naive cache (keep the 5 most
 "complex" failures) plus an ever-growing blob of appended hints. That design has
 two fatal flaws:
 
-1. Buffer replacement keyed on raw complexity gets stuck in a local optimum --
-   one spectacularly "complex" failure can occupy a slot forever and starve the
+1. Replacement keyed on raw complexity gets stuck in a local optimum -- one
+   spectacularly "complex" failure can occupy a slot forever and starve the
    buffer of fresh, explorable experience.
 2. Appended hints grow unboundedly and eventually overflow the context window.
 
@@ -19,60 +19,84 @@ This module replaces that with a three-stage evolution algorithm:
     Every failure is distilled into a strict ``IF ... THEN ... BECAUSE ...``
     ban with concrete state tokens; no fuzzy words like "careful"/"watch out".
 - Stage 3  Defrag: periodic compaction
-    Once the accumulated extra directives exceed a character budget, all of
-    them are merged/coarsened by the LLM into a shorter high-level strategy set.
+    Once the archived directives exceed a character budget, they are
+    merged/coarsened (by the LLM, or a deterministic fallback) into a shorter
+    high-level strategy set.
+
+Data-flow contract -- the working set and the archive are DISJOINT::
+
+    feedback
+       |
+       v
+   compress_feedback()   --[Stage 2]-->  directive (a rule string; PURE, no store mutation)
+       |
+       v
+   update_buffer()       --[Stage 1]-->  BufferItem (working set, <= capacity)
+                                                 |
+                            on eviction: demoted v
+                                       extra_directives  --[Stage 3]-->  defragment_memory()
+
+``get_current_context()`` emits the live working set (buffer, ranked by the
+*current* decayed score) followed by the archive (``extra_directives``). A rule
+lives in exactly one store at any time, so the rendered context never duplicates
+a ban. The epoch is advanced internally by ``remember()``, so time decay always
+bites -- the loop never has to manage it.
 
 Design constraints honoured here:
 
 - Zero external dependencies: no Redis, no vector DB, no disk state. All data
-  lives in plain in-memory Python objects / the current prompt context.
+  lives in plain in-memory Python objects handed back via the context string.
 - Backwards compatible: ``get_current_context()`` keeps its name and shape so
-  the main game loop can keep calling it unchanged.
-- Observable: every buffer replacement / compression / defrag logs a one-line
-  ``print`` (e.g. ``[Defrag] Compressed from 2500 to 1100 chars``).
-
-The optional ``llm`` argument is a plain callable ``prompt: str -> str``. When
-it is ``None`` the module falls back to deterministic in-memory rules so the
-experiment still runs without any external service; wiring in the real
-``LLMProvider`` is a one-liner.
+  the main game loop can call it unchanged.
+- Observable: every buffer insertion / replacement / demotion / compression /
+  defrag is emitted at INFO level on the ``pecei.memory`` logger (library
+  modules here do not print; only the interactive CLI layer does).
+- Offline-capable: the optional ``llm`` is a plain callable ``prompt: str -> str``.
+  When it is ``None`` (or it raises, or returns nothing usable) deterministic
+  in-memory fallbacks keep the pipeline running so an experiment still runs
+  without any external service.
 """
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass, field
-from typing import Any, Callable, Optional
+from collections.abc import Callable
+from dataclasses import dataclass
+from typing import Any
 
 logger = logging.getLogger("pecei.memory")
 
 
-#: Hard-coded format contract injected into the LLM compression prompt.
+#: Format contract injected into the LLM compression prompt.
 COMPRESS_PROMPT_TEMPLATE: str = (
-    "请将本次失败抽象为一条禁令。输出格式严格为："
-    "IF [游戏状态特征组合] THEN [禁止执行的动作] BECAUSE [简述后果]。"
-    "严禁使用模糊词汇（如'小心''注意'），必须提及具体的数值或状态标识。"
+    "Distil this failure into ONE strict ban. Output exactly: "
+    "IF [concrete combination of game-state tokens] "
+    "THEN [the action that is forbidden] "
+    "BECAUSE [the concrete consequence]. "
+    "No fuzzy wording ('careful', 'watch out'); cite concrete state tokens or "
+    "numeric values."
 )
 
-#: Hard-coded merge directive for periodic defragmentation.
+#: Merge directive for periodic defragmentation.
 DEFRAG_PROMPT_TEMPLATE: str = (
-    "请合并以下所有禁令，剔除重复或矛盾的项。"
-    "将同类的IF条件归纳为更通用的高阶策略，"
-    "输出长度必须压缩至现有文本的50%以内。"
+    "Merge all of the following bans. Drop duplicates and contradictions, "
+    "generalise similar IF-conditions into one higher-level strategy, and keep "
+    "the output under 50% of the input length."
 )
 
 #: Exploration decay coefficient, configurable at construction time.
 DEFAULT_ALPHA: float = 0.1
-#: Buffer capacity -- the top-5 working set of failure memories.
+#: Buffer capacity -- the working set of failure memories.
 DEFAULT_BUFFER_CAPACITY: int = 5
-#: Defrag triggers when the accumulated extra directives exceed this many chars.
+#: Defrag triggers when the archived directives exceed this many chars.
 DEFAULT_DEFRAG_THRESHOLD: int = 2000
 
 
 def _default_complexity(feedback: Any) -> float:
-    """Extract a numeric complexity from a Feedback-like object.
+    """Extract a numeric difficulty from a Feedback-like object.
 
-    Prefers ``failure_snapshot.complexity``; falls back to ``rounds_used``
-    (a long burn usually means a hard failure) then 1.0 so the pipeline never
-    crashes on a SUCCESS / compile-error feedback.
+    Prefers ``failure_snapshot.complexity`` (entity-aware path cost to goal);
+    falls back to ``rounds_used`` (a long burn usually means a hard failure)
+    then 1.0 so the pipeline never crashes on a SUCCESS / compile-error feedback.
     """
     snap = getattr(feedback, "failure_snapshot", None)
     if snap is not None:
@@ -87,12 +111,12 @@ def _default_complexity(feedback: Any) -> float:
 
 @dataclass
 class BufferItem:
-    """One failure memory held in the evolving buffer."""
+    """One failure memory held in the evolving working-set buffer."""
 
-    content: str                          # distilled ban text (IF/THEN/BECAUSE)
-    complexity: float                      # raw difficulty signal
-    feedback_epoch: int                    # global epoch when the feedback was born
-    score: float                           # complexity - alpha * age
+    content: str            # distilled ban text (IF/THEN/BECAUSE)
+    complexity: float       # raw difficulty signal captured at birth
+    feedback_epoch: int     # global epoch when the feedback was born
+    score: float            # birth-time snapshot of the decayed score (for logging)
 
     def age(self, current_epoch: int) -> int:
         return max(0, current_epoch - self.feedback_epoch)
@@ -101,11 +125,11 @@ class BufferItem:
 class MemoryEvolution:
     """Core memory & evolution module of the game-clearing agent.
 
-    Main loop usage (backwards compatible)::
+    Main-loop usage (backwards compatible)::
 
         memory = MemoryEvolution(llm=my_llm)          # or llm=None for pure in-memory
         feedback = session.last_feedback()
-        memory.remember(feedback)                      # compress + buffer update
+        memory.remember(feedback)                      # compress + buffer update + tick
         context = memory.get_current_context()         # unchanged interface
         if memory.should_defragment():
             memory.defragment_memory()
@@ -117,15 +141,15 @@ class MemoryEvolution:
         alpha: float = DEFAULT_ALPHA,
         buffer_capacity: int = DEFAULT_BUFFER_CAPACITY,
         defrag_threshold: int = DEFAULT_DEFRAG_THRESHOLD,
-        llm: Optional[Callable[[str], str]] = None,
+        llm: Callable[[str], str] | None = None,
     ) -> None:
         self.alpha = alpha
         self.buffer_capacity = buffer_capacity
         self.defrag_threshold = defrag_threshold
         self.llm = llm
-        self.epoch = 0                      # global round counter, advanced by the loop
-        self.buffer: list[BufferItem] = []  # stage 1 working set (<= capacity)
-        self.extra_directives: list[str] = []  # stage 2/3 appended hint pool
+        self.epoch = 0                       # advanced internally by remember()
+        self.buffer: list[BufferItem] = []   # stage 1 working set (<= capacity)
+        self.extra_directives: list[str] = []  # stage 2/3 archive (evicted + defrag)
 
     # ------------------------------------------------------------------ #
     # public API (backwards compatible with the main game loop)
@@ -134,22 +158,27 @@ class MemoryEvolution:
     def remember(self, feedback: Any) -> str:
         """One-shot ingestion: compress ``feedback`` then update the buffer.
 
-        Returns the distilled ban text so the caller can see what was learned.
+        Auto-advances the epoch, so each call is one exploration round and time
+        decay always bites (the loop never has to manage ``epoch`` itself).
+        Returns the distilled ban text. Compression never yields an empty
+        directive -- an offline fallback fills it in -- so a feedback is always
+        represented in the working set.
         """
         directive = self.compress_feedback(feedback)
-        self.update_buffer(feedback)
+        if directive:
+            self.update_buffer(feedback, directive)
+        self.epoch += 1
         return directive
 
     def get_current_context(self) -> str:
         """Assemble the full "additional prompt" handed to the author.
 
-        Buffer bans come first (ranked by score), then the extra directives
-        pool. Empty memory yields an empty string so the caller's prompt
+        The live working set comes first (ranked by *current* decayed score),
+        then the archive. The two stores are disjoint, so no ban is ever
+        duplicated. Empty memory yields an empty string so the caller's prompt
         building logic is unchanged.
         """
-        parts: list[str] = []
-        for item in sorted(self.buffer, key=lambda b: b.score, reverse=True):
-            parts.append(item.content)
+        parts: list[str] = [item.content for item in self._ranked_buffer()]
         parts.extend(self.extra_directives)
         return "\n".join(p for p in parts if p)
 
@@ -169,25 +198,31 @@ class MemoryEvolution:
     def _current_score(self, item: BufferItem) -> float:
         """Re-evaluate an incumbent's score at the *current* epoch.
 
-        ``item.score`` is a birth-time snapshot; comparisons for replacement
-        must use the live decayed value so time decay actually bites.
+        ``item.score`` is a birth-time snapshot (handy for logging); every live
+        decision -- replacement, ranking -- must use this decayed value so time
+        decay actually bites.
         """
         return self._score(item.complexity, item.feedback_epoch)
 
-    def update_buffer(self, feedback: Any) -> None:
-        """Insert ``feedback`` into the buffer using the exploration score.
+    def _ranked_buffer(self) -> list[BufferItem]:
+        """Buffer sorted by live decayed score (highest = most relevant first)."""
+        return sorted(self.buffer, key=self._current_score, reverse=True)
 
-        - Buffer not yet full (capacity 5): append directly, no replacement.
-        - Buffer full: compare scores -- if the new entry's Score beats the
-          lowest-Score incumbent, evict that loser and insert the newcomer.
-          Plain ``complexity`` comparison is never used.
+    def update_buffer(self, feedback: Any, directive: str) -> None:
+        """Insert ``directive`` (born from ``feedback``) into the working set.
 
-        The replacement is logged for experiment observation.
+        - Buffer not yet full: append directly.
+        - Buffer full: if the newcomer's score beats the weakest incumbent's
+          *live* score, evict that incumbent (demoting it into the archive) and
+          insert the newcomer; otherwise drop the newcomer -- it lost the
+          working-set contest and is not worth retaining.
+
+        Plain ``complexity`` is never used for comparison; only the decayed
+        score is.
         """
         complexity = _default_complexity(feedback)
         feedback_epoch = self.epoch
         score = self._score(complexity, feedback_epoch)
-        directive = self._latest_directive(feedback)
 
         if len(self.buffer) < self.buffer_capacity:
             self.buffer.append(
@@ -198,15 +233,12 @@ class MemoryEvolution:
                     score=score,
                 )
             )
-            print(
-                f"[Buffer] appended {len(self.buffer)}/{self.buffer_capacity} "
-                f"complexity={complexity:.2f} score={score:.2f} epoch={self.epoch}"
+            logger.info(
+                "[Buffer] appended %d/%d complexity=%.2f score=%.2f epoch=%d",
+                len(self.buffer), self.buffer_capacity, complexity, score, self.epoch,
             )
             return
 
-        # Buffer is full: replace the weakest incumbent iff the newcomer wins.
-        # All incumbents are re-scored at the *current* epoch so the decayed
-        # veterans lose their grip instead of camping on birth-time scores.
         idx_min = min(
             range(len(self.buffer)),
             key=lambda i: self._current_score(self.buffer[i]),
@@ -214,23 +246,33 @@ class MemoryEvolution:
         incumbent = self.buffer[idx_min]
         incumbent_live = self._current_score(incumbent)
         if score > incumbent_live:
-            victim = incumbent
             self.buffer[idx_min] = BufferItem(
                 content=directive,
                 complexity=complexity,
                 feedback_epoch=feedback_epoch,
                 score=score,
             )
-            print(
-                f"[Buffer] replaced live-score={incumbent_live:.2f} "
-                f"(complexity={victim.complexity:.2f}, epoch={victim.feedback_epoch}) "
-                f"-> score={score:.2f} (complexity={complexity:.2f}, epoch={self.epoch})"
+            self._demote(incumbent)
+            logger.info(
+                "[Buffer] replaced live-score=%.2f (complexity=%.2f, epoch=%d) "
+                "-> score=%.2f (complexity=%.2f, epoch=%d); incumbent archived",
+                incumbent_live, incumbent.complexity, incumbent.feedback_epoch,
+                score, complexity, self.epoch,
             )
         else:
-            print(
-                f"[Buffer] kept buffer; new score={score:.2f} <= min="
-                f"{incumbent_live:.2f}, no replacement"
+            logger.info(
+                "[Buffer] kept working set; newcomer score=%.2f <= min=%.2f, dropped",
+                score, incumbent_live,
             )
+
+    def _demote(self, item: BufferItem) -> None:
+        """Move a graduated rule from the working set into the archive.
+
+        The archive is the sole input to defragmentation; the working-set buffer
+        is never compacted (it holds the currently-relevant hypotheses).
+        """
+        if item.content:
+            self.extra_directives.append(item.content)
 
     # ------------------------------------------------------------------ #
     # Stage 2: structured IF-THEN-BECAUSE compression
@@ -239,78 +281,64 @@ class MemoryEvolution:
     def compress_feedback(self, feedback: Any) -> str:
         """Distil a failure into one strict IF/THEN/BECAUSE ban.
 
-        The LLM prompt is force-injected with the hard-coded format contract;
-        no fuzzy wording is allowed, concrete state tokens are mandatory. When
-        no LLM is wired in, a deterministic rule-based fallback produces the
-        triple from the feedback fields so the loop still runs offline.
+        Pure w.r.t. the memory stores: it returns the directive string and never
+        mutates the buffer or the archive. When no LLM is wired in (or it raises,
+        or returns nothing usable) a deterministic rule-based fallback produces
+        the triple from the feedback fields so the loop still runs offline.
         """
-        snapshot = getattr(feedback, "failure_snapshot", None)
-        state_desc = _describe_snapshot(snapshot)
+        state_desc = _describe_snapshot(getattr(feedback, "failure_snapshot", None))
         consequence = _describe_failure(feedback)
 
         if self.llm is not None:
             prompt = (
                 f"{COMPRESS_PROMPT_TEMPLATE}\n\n"
-                f"失败反馈如下：\n"
-                f"- 停止原因: {getattr(feedback, 'stop_reason', None)}\n"
-                f"- 已用轮数: {getattr(feedback, 'rounds_used', None)}\n"
-                f"- 失败状态: {state_desc}\n"
-                f"- 后果: {consequence}\n"
-                f"- 涉及脚本片段: {(getattr(feedback, 'script', '') or '')[:500]}\n"
+                f"Failure feedback:\n"
+                f"- stop reason: {getattr(feedback, 'stop_reason', None)}\n"
+                f"- rounds used: {getattr(feedback, 'rounds_used', None)}\n"
+                f"- failure state: {state_desc}\n"
+                f"- consequence: {consequence}\n"
+                f"- script excerpt: {(getattr(feedback, 'script', '') or '')[:500]}\n"
             )
             try:
                 directive = (self.llm(prompt) or "").strip()
-            except Exception as exc:  # never let a compression hiccup kill the loop
+            except Exception as exc:  # noqa: BLE001 - arbitrary llm callable; never crash the loop
                 logger.warning("compress_feedback LLM call failed: %s", exc)
-                directive = self._rule_based_directive(state_desc, consequence)
-        else:
-            directive = self._rule_based_directive(state_desc, consequence)
+                directive = ""
+            if directive:
+                logger.info("[Compress] LLM directive (%d chars)", len(directive))
+                return directive
 
-        if directive:
-            self.extra_directives.append(directive)
-            print(f"[Compress] +1 directive ({len(directive)} chars)")
-        else:
-            print("[Compress] empty directive, skipped")
+        directive = self._rule_based_directive(state_desc, consequence)
+        logger.info("[Compress] rule-based directive (%d chars)", len(directive))
         return directive
 
     def _rule_based_directive(self, state_desc: str, consequence: str) -> str:
         """Offline fallback that still honours the strict triple contract."""
         state = state_desc or "unknown_state"
         return (
-            f"IF [{state}] THEN [do not repeat the failed action at this "
-            f"state] BECAUSE [{consequence}]"
-        )
-
-    def _latest_directive(self, feedback: Any) -> str:
-        """The directive most recently produced for ``feedback`` (buffer slot text)."""
-        # compress_feedback already appended it; the newest pool entry is ours.
-        if self.extra_directives:
-            return self.extra_directives[-1]
-        return self._rule_based_directive(
-            _describe_snapshot(getattr(feedback, "failure_snapshot", None)),
-            _describe_failure(feedback),
+            f"IF [{state}] THEN [do not repeat the action that led here] "
+            f"BECAUSE [{consequence}]"
         )
 
     # ------------------------------------------------------------------ #
-    # Stage 3: periodic defragmentation
+    # Stage 3: periodic defragmentation (archive only)
     # ------------------------------------------------------------------ #
 
     def extra_directives_size(self) -> int:
-        """Total character size of the accumulated extra directives."""
+        """Total character size of the archived directives."""
         return sum(len(d) for d in self.extra_directives)
 
     def should_defragment(self) -> bool:
-        """Defrag when the extra-directive pool exceeds the char threshold."""
+        """Defrag when the archive exceeds the char threshold."""
         return self.extra_directives_size() > self.defrag_threshold
 
     def defragment_memory(self) -> None:
-        """Merge all extra directives into a compact high-level strategy set.
+        """Merge all archived directives into a compact high-level strategy set.
 
-        Only triggers when the accumulated directives exceed the threshold
-        (callers may also call it unconditionally at loop start; it is a no-op
-        below the threshold). The LLM is asked to drop duplicates/contradictions
-        and generalise, and must output <= 50% of the input length. The result
-        overwrites the extra-directive pool in place.
+        Only the archive is compacted. The live working-set buffer is left
+        untouched (it holds the currently-relevant hypotheses); defrag
+        consolidates the longer-term background knowledge that has been demoted
+        out of the working set. The merged result overwrites the archive.
         """
         if not self.should_defragment():
             return
@@ -320,36 +348,34 @@ class MemoryEvolution:
 
         merged = ""
         if self.llm is not None:
-            prompt = f"{DEFRAG_PROMPT_TEMPLATE}\n\n当前禁令列表：\n{old_text}"
+            prompt = f"{DEFRAG_PROMPT_TEMPLATE}\n\nCurrent bans:\n{old_text}"
             try:
                 merged = (self.llm(prompt) or "").strip()
-            except Exception as exc:  # pragma: no cover - defensive
+            except Exception as exc:  # noqa: BLE001 - arbitrary llm callable; never crash the loop
                 logger.warning("defragment_memory LLM call failed: %s", exc)
         if not merged:
             merged = self._rule_based_merge(old_text, target)
 
         self.extra_directives = [merged] if merged else []
-        new_size = len(merged)
-        print(
-            f"[Defrag] Compressed from {old_size} to {new_size} chars "
-            f"({len(self.extra_directives)} directive(s))"
+        logger.info(
+            "[Defrag] compressed %d -> %d chars (%d directive(s))",
+            old_size, len(merged), len(self.extra_directives),
         )
 
     def _rule_based_merge(self, old_text: str, target: int) -> str:
-        """Deterministic in-memory merge fallback: dedupe by IF-condition key.
+        """Deterministic merge fallback: dedupe by IF-condition key, then cap.
 
-        Groups directives by their IF head, keeps the most specific survivor per
-        group, then hard-caps the output at ``target`` chars when the LLM is
-        unavailable -- still a strict shrink from the input.
+        Groups directives by their IF head, keeps the most specific (longest)
+        survivor per group, and hard-caps the output at ``target`` chars -- still
+        a strict shrink from the input.
         """
         lines = [ln.strip() for ln in old_text.splitlines() if ln.strip()]
         seen: dict[str, str] = {}
         for ln in lines:
             if "IF " in ln:
-                key = ln.split("IF ", 1)[1].split("]")[0].strip()[:24]
+                key = ln.split("IF ", 1)[1].split("]", 1)[0].strip()[:32]
             else:
-                key = ln[:24]
-            # prefer longer (more specific) survivors within the same group
+                key = ln[:32]
             if key not in seen or len(ln) > len(seen[key]):
                 seen[key] = ln
         merged = "\n".join(seen.values())
@@ -359,28 +385,58 @@ class MemoryEvolution:
 
 
 # ---------------------------------------------------------------------- #
-# small helpers
+# snapshot helpers -- render the REAL FailureSnapshot fields as tokens
 # ---------------------------------------------------------------------- #
 
 def _describe_snapshot(snapshot: Any) -> str:
+    """Render a FailureSnapshot (pos + ego entity graph + complexity) as tokens.
+
+    ``FailureSnapshot`` carries ``pos``, ``complexity`` and ``current_state``
+    (the ego's ``Entity.to_dict()``: anchor, orientation, component inventory).
+    All three are surfaced as concrete tokens for the IF-CONDITION; the component
+    inventory is the richest signal, so it is included whenever present.
+    """
     if snapshot is None:
         return "state_unknown"
-    pos = getattr(snapshot, "pos", None)
+
     parts: list[str] = []
+    pos = getattr(snapshot, "pos", None)
     if pos is not None:
-        try:
-            parts.append(f"pos={tuple(pos)}")
-        except TypeError:
-            parts.append(f"pos={pos}")
-    for key in ("energy", "hp", "round", "complexity"):
-        val = getattr(snapshot, key, None)
-        if val is not None:
-            parts.append(f"{key}={val}")
+        parts.append(f"pos={tuple(pos)}")
+    comp = getattr(snapshot, "complexity", None)
+    if comp is not None:
+        parts.append(f"complexity={comp}")
+
+    state = getattr(snapshot, "current_state", None)
+    if isinstance(state, dict):
+        ego_desc = _describe_ego(state)
+        if ego_desc:
+            parts.append(ego_desc)
+
     return ",".join(parts) if parts else "state_unknown"
 
 
+def _describe_ego(ego: dict) -> str:
+    """Compact token for an ego entity graph (``Entity.to_dict()``)."""
+    anchor = ego.get("anchor")
+    orientation = ego.get("orientation")
+    ctypes = sorted({c.get("type") for c in ego.get("components", []) if c.get("type")})
+    head = "ego"
+    if anchor is not None:
+        head += f"@{tuple(anchor)}"
+    if orientation:
+        head += f":{orientation}"
+    if ctypes:
+        head += f"[{','.join(ctypes)}]"
+    return head
+
+
 def _describe_failure(feedback: Any) -> str:
+    """Concrete consequence token: stop reason (+ compile-error text if any)."""
+    bits: list[str] = []
     stop = getattr(feedback, "stop_reason", None)
-    if stop is not None:
-        return f"stop_reason={getattr(stop, 'value', stop)}"
-    return "stop_reason=unknown"
+    bits.append(f"stop_reason={getattr(stop, 'value', stop)}")
+    err = getattr(feedback, "compile_error", None)
+    if err:
+        bits.append(f"compile_error={err[:120]}")
+    return ", ".join(bits)
