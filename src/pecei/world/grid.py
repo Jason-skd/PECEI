@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from .component import Component, ComponentType
+from .component import SOLID, Component, ComponentType
 from .entity import Entity
 
 
@@ -22,18 +22,11 @@ _GLYPH: dict[ComponentType, str] = {
     ComponentType.WHEEL: "o",
     ComponentType.BRAIN: "@",
     ComponentType.METAL: "m",
+    ComponentType.GOAL: "G",
 }
 
-# Component types that physically block movement. Liquids (water) and fire are
-# non-blocking terrain: they affect an actor through attributes, not collision.
-# This set is tunable as behavior is fleshed out (M3).
-_SOLID: frozenset[ComponentType] = frozenset({
-    ComponentType.STONE,
-    ComponentType.METAL,
-    ComponentType.WOOD,
-    ComponentType.WHEEL,
-    ComponentType.BRAIN,
-})
+# Movement-blocking types come from component.SOLID (single source of truth,
+# shared with CellView.is_blocked so perception and collision never disagree).
 
 
 @dataclass
@@ -66,13 +59,23 @@ class Grid:
 
     def is_blocked(self, x: int, y: int) -> bool:
         """True if any occupant is solid."""
-        return any(o.component.ctype in _SOLID for o in self.occupants(x, y))
+        return any(o.component.ctype in SOLID for o in self.occupants(x, y))
 
     def place(self, entity: Entity) -> None:
         """Write an Entity's components into their absolute cells (stacking)."""
         for (x, y), (local, comp) in entity.placements().items():
             self._check(x, y)
             self._cells[y][x].append(Occupant(entity.eid, local, comp))
+
+    def stamp(self, x: int, y: int, eid: str, component: Component) -> None:
+        """Drop a single marker occupant into one cell (stacking).
+
+        Used for non-Entity fixtures like the GOAL marker: it must occupy the
+        cell so observers perceive it via ctype, but it is not an actor and is
+        never registered in :class:`World.entities`.
+        """
+        self._check(x, y)
+        self._cells[y][x].append(Occupant(eid, (0, 0), component))
 
     def remove(self, eid: str) -> None:
         """Remove all occupants of entity ``eid`` from every cell."""

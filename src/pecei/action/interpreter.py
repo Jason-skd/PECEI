@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import operator
 from dataclasses import dataclass
-from typing import Any, Callable
+from typing import TYPE_CHECKING, Any, Callable
 
 from pecei.world.actions import ActionType
 
@@ -17,6 +17,7 @@ from .ast_nodes import (
     Act,
     Assign,
     Attr,
+    At,
     BoolOp,
     Beat,
     BeatOp,
@@ -30,7 +31,9 @@ from .ast_nodes import (
     While,
 )
 from .typecheck import type_check
-from .views import NavObs
+
+if TYPE_CHECKING:
+    from pecei.observation import Observation
 
 _OPS = {
     "==": operator.eq, "!=": operator.ne,
@@ -46,9 +49,9 @@ class BudgetExceeded(Exception):
 @dataclass
 class Host:
     """Injected runtime callbacks (built by the engine/orchestrator)."""
-    act: Callable[[ActionType], bool]          # returns whether it moved
-    observe: Callable[[], NavObs]              # beat(OBSERVE) -> navigable obs
-    yield_: Callable[[NavObs], None]           # beat(YIELD, obs) -> report sink
+    act: Callable[[ActionType], bool]              # returns whether it moved
+    observe: Callable[[], "Observation"]           # beat(OBSERVE) -> egocentric obs
+    yield_: Callable[["Observation"], None]        # beat(YIELD, obs) -> report sink
 
 
 class Interpreter:
@@ -110,6 +113,9 @@ class Interpreter:
             return self.host.act(e.action)
         if isinstance(e, Attr):
             return getattr(self._eval(e.obj, env), e.attr)
+        if isinstance(e, At):
+            obs = self._eval(e.obj, env)
+            return obs.at(self._eval(e.dx, env), self._eval(e.dy, env))
         if isinstance(e, Compare):
             return _OPS[e.op](self._eval(e.left, env), self._eval(e.right, env))
         if isinstance(e, BoolOp):

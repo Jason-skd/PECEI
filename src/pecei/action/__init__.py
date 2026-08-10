@@ -9,6 +9,7 @@ from .ast_nodes import (
     Act,
     Assign,
     Attr,
+    At,
     BoolOp,
     Beat,
     BeatOp,
@@ -23,12 +24,11 @@ from .ast_nodes import (
 )
 from .interpreter import BudgetExceeded, Host, Interpreter
 from .pretty import pretty
-from .typecheck import CELL_BOOLS, CELL_STR, OBS_DIRS, CompileError, type_check
-from .views import NavCell, NavObs
+from .typecheck import CELL_BOOLS, CELL_STR, CompileError, type_check
 
 __all__ = [
-    "Act", "Assign", "Attr", "Beat", "BeatOp", "BoolOp", "BudgetExceeded",
+    "Act", "Assign", "At", "Attr", "Beat", "BeatOp", "BoolOp", "BudgetExceeded",
     "CELL_BOOLS", "CELL_STR", "CompileError", "Compare", "ExprStmt", "For",
-    "Host", "If", "Interpreter", "Lit", "NavCell", "NavObs", "OBS_DIRS",
-    "Program", "Var", "While", "pretty", "type_check",
+    "Host", "If", "Interpreter", "Lit", "Program", "Var", "While",
+    "pretty", "type_check",
 ]

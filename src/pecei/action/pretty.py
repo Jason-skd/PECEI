@@ -10,6 +10,7 @@ from .ast_nodes import (
     Act,
     Assign,
     Attr,
+    At,
     BoolOp,
     Beat,
     BeatOp,
@@ -64,6 +65,8 @@ def _expr(e) -> str:
         return e.name
     if isinstance(e, Attr):
         return f"{_expr(e.obj)}.{e.attr}"
+    if isinstance(e, At):
+        return f"{_expr(e.obj)}.at({_expr(e.dx)}, {_expr(e.dy)})"
     if isinstance(e, Compare):
         return f"{_expr(e.left)} {e.op} {_expr(e.right)}"
     if isinstance(e, BoolOp):

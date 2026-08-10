@@ -6,6 +6,7 @@ from pydantic import ValidationError
 from pecei.action import (
     Act,
     Assign,
+    At,
     Attr,
     Beat,
     BeatOp,
@@ -19,7 +20,6 @@ from pecei.action import (
     If,
     Interpreter,
     Lit,
-    NavObs,
     Program,
     Var,
     While,
@@ -27,7 +27,7 @@ from pecei.action import (
     type_check,
 )
 from pecei.engine import RoundEngine
-from pecei.observation import observe
+from pecei.observation import Observation, observe
 from pecei.world import Component, Direction, Entity, World
 from pecei.world.actions import ActionType
 
@@ -48,22 +48,29 @@ def _eye_world_with_wall():
     return w
 
 
+def _at(dx: int, dy: int, var: str = "ob") -> At:
+    """Build an ``At`` node for the cell at canonical offset (dx, dy)."""
+    return At(obj=Var(name=var), dx=Lit(value=dx), dy=Lit(value=dy))
+
+
 def _make_host(world, ego_eid, budget=50):
     eng = RoundEngine(world, round_budget=budget)
     yielded = []
     host = Host(
         act=lambda a: eng.apply(ego_eid, a).moved,
-        observe=lambda: NavObs(observe(world, ego_eid), world.goal),
+        observe=lambda: observe(world, ego_eid),
         yield_=lambda v: yielded.append(v),
     )
     return eng, host, yielded
 
 
 def _sense_front_program():
-    """ob = beat(OBSERVE); blocked = ob.front.is_blocked; if blocked: turn else: forward"""
+    """ob = beat(OBSERVE); blocked = ob.at(1,0).is_blocked; if blocked: turn else: forward.
+
+    Canonical frame: +x is the gaze, so (1,0) is the cell directly ahead."""
     return Program(body=[
         Assign(name="ob", expr=Beat(op=BeatOp.OBSERVE)),
-        Assign(name="blocked", expr=Attr(obj=Attr(obj=Var(name="ob"), attr="front"), attr="is_blocked")),
+        Assign(name="blocked", expr=Attr(obj=_at(1, 0), attr="is_blocked")),
         If(test="blocked",
            then=[ExprStmt(expr=Act(action=ActionType.TURNRIGHT))],
            orelse=[ExprStmt(expr=Act(action=ActionType.FORWARD))]),
@@ -102,7 +109,7 @@ def test_yield_writes_observation():
     ])
     Interpreter(host).run(prog)
     assert len(yielded) == 1
-    assert isinstance(yielded[0], NavObs)
+    assert isinstance(yielded[0], Observation)
 
 
 def test_act_round_budget_propagates():
@@ -142,11 +149,11 @@ def test_observe_must_be_assigned():
 def test_bool_op_and_compare_typecheck():
     prog = Program(body=[
         Assign(name="ob", expr=Beat(op=BeatOp.OBSERVE)),
-        Assign(name="b1", expr=Attr(obj=Attr(obj=Var(name="ob"), attr="front"), attr="is_fire")),
-        Assign(name="b2", expr=Attr(obj=Attr(obj=Var(name="ob"), attr="left"), attr="is_water")),
+        Assign(name="b1", expr=Attr(obj=_at(1, 0), attr="is_fire")),
+        Assign(name="b2", expr=Attr(obj=_at(0, -1), attr="is_water")),
         Assign(name="b", expr=BoolOp(op="or", operands=[Var(name="b1"), Var(name="b2")])),
         Assign(name="c", expr=Compare(op="==",
-                                      left=Attr(obj=Attr(obj=Var(name="ob"), attr="here"), attr="ctype"),
+                                      left=Attr(obj=_at(0, 0), attr="ctype"),
                                       right=Lit(value="brain"))),
         If(test="b", then=[], orelse=[]),
     ])
@@ -191,16 +198,16 @@ def _eye_east(width, anchor=(2, 2), wall=None, height=5):
 
 
 def _while_until_blocked_program():
-    """clear = True; while clear: forward, re-observe, re-check front clear.
+    """clear = True; while clear: forward, re-observe, re-check the cell ahead.
 
-    Walks east until the front cell is no longer empty (a wall)."""
+    Walks forward until the cell one step ahead (canonical (1,0)) is not empty."""
     return Program(body=[
         Assign(name="ob", expr=Beat(op=BeatOp.OBSERVE)),
-        Assign(name="clear", expr=Attr(obj=Attr(obj=Var(name="ob"), attr="front"), attr="is_empty")),
+        Assign(name="clear", expr=Attr(obj=_at(1, 0), attr="is_empty")),
         While(test="clear", body=[
             ExprStmt(expr=Act(action=ActionType.FORWARD)),
             Assign(name="ob", expr=Beat(op=BeatOp.OBSERVE)),
-            Assign(name="clear", expr=Attr(obj=Attr(obj=Var(name="ob"), attr="front"), attr="is_empty")),
+            Assign(name="clear", expr=Attr(obj=_at(1, 0), attr="is_empty")),
         ]),
     ])
 
@@ -267,7 +274,7 @@ def test_for_count_must_be_int():
     bad = Program(body=[
         Assign(name="ob", expr=Beat(op=BeatOp.OBSERVE)),
         # a bool predicate is not a valid count
-        For(count=Attr(obj=Attr(obj=Var(name="ob"), attr="front"), attr="is_blocked"),
+        For(count=Attr(obj=_at(1, 0), attr="is_blocked"),
             body=[]),
     ])
     with pytest.raises(CompileError):

@@ -49,16 +49,18 @@ class Renderer:
 
         eid_to_entity = {e.eid: e for e in (entities or [])}
 
-        # top occupant's entity per cell (for unified outlines + ego highlight)
+        # top occupant's entity per cell (for unified outlines + ego highlight).
+        # Non-entity marker occupants (e.g. the GOAL stamp, eid="goal") are not
+        # actors: they are rendered via the goal ring, not as a cell block.
         cell_eid: dict[tuple[int, int], str] = {}
         for y in range(grid.height):
             for x in range(grid.width):
-                occs = grid.occupants(x, y)
+                occs = [o for o in grid.occupants(x, y) if o.eid in eid_to_entity]
                 if occs:
                     cell_eid[(x, y)] = occs[-1].eid
 
         for (x, y) in cell_eid:
-            occs = grid.occupants(x, y)
+            occs = [o for o in grid.occupants(x, y) if o.eid in eid_to_entity]
             self._draw_cell(surf, x, y, occs[-1].component.ctype, stacked=len(occs) > 1)
 
         self._draw_outlines(surf, cell_eid, eid_to_entity)

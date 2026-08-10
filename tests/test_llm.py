@@ -29,19 +29,19 @@ def test_render_user_shows_seed_observation_feedback_and_instructions():
     turn = TurnInput(
         instructions="experiment session 2 of 4: map 'maze'",
         seed_observation={
-            "anchor": [3, 2], "orientation": "EAST",
-            "cells": {"1,0": {"types": ["stone"]}, "1,1": {"types": []}},
-            "goal": [6, 2],
+            "vision_range": 5, "half_angle": 45.0,
+            "cells": {"1,0": {"types": ["stone"]}, "5,0": {"types": ["goal"]}, "1,1": {"types": []}},
         },
         feedback=Feedback(stop_reason=Result.SCRIPT_ENDED, rounds_used=1),
     )
     out = render_user(turn)
     assert "DIRECTIVE: PLAN" in out
     assert "INSTRUCTIONS" in out and "2 of 4" in out
-    assert "goal: [6, 2]" in out
-    assert "seed observation:" in out and "facing EAST at [3, 2]" in out
-    assert "1,0:stone" in out                         # partial cone cell rendered
-    assert "layout" not in out and "map:" not in out  # god-view layout gone
+    assert "goal:" not in out                              # no absolute goal coordinate
+    assert "seed observation:" in out and "+x = your gaze" in out
+    assert "1,0:stone" in out and "5,0:goal" in out        # canonical cells rendered (goal as a type)
+    assert "layout" not in out and "map:" not in out       # god-view layout gone
+    assert "facing" not in out and "EAST" not in out       # no orientation/compass leak
     assert "last_cycle stopped: SCRIPT_ENDED" in out
 
 

@@ -17,7 +17,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from pecei.action import BudgetExceeded, CompileError, Host, Interpreter, NavObs, pretty
+from pecei.action import BudgetExceeded, CompileError, Host, Interpreter, pretty
 from pecei.engine import RoundEngine
 from pecei.infra import FailureSnapshot, Result, Trace, TraceEvent, build_report
 from pecei.llm import Directive, Feedback, LLMProvider, TurnInput
@@ -51,11 +51,11 @@ class ScriptRun:
 
 
 def seed_observation(world: World) -> dict:
-    """The author's PARTIAL start-pose view: the 90° FOV cone from the ego's
-    start anchor (``observe(...).to_dict()``), plus the goal coordinate as task
-    framing. NOT a god-view map — walls/water/fire beyond the cone are withheld;
-    the author must discover them by having its script ``beat(OBSERVE)`` /
-    ``beat(YIELD)`` and reading the yields fed back next cycle.
+    """The author's PARTIAL start-pose view: the 90° egocentric camera frame from
+    the ego's start anchor (``observe(...).to_dict()``). NOT a god-view map, and
+    NO absolute coordinates — no anchor, no orientation, no goal coordinate. The
+    goal is only ever visible as a ``goal`` component when its cell enters the
+    camera frame; the author must turn/look to find it.
 
     Given every cycle: each ``decide()`` is a stateless single LLM call, and the
     start pose is identical every cycle (map reloads fresh), so this is the
@@ -63,9 +63,7 @@ def seed_observation(world: World) -> dict:
     one-time seed replayed each turn, not new information.
     """
     ego = world.ego
-    obs = observe(world, ego.eid).to_dict()
-    obs["goal"] = list(world.goal) if world.goal else None
-    return obs
+    return observe(world, ego.eid).to_dict()
 
 
 def run_script(
@@ -101,8 +99,8 @@ def run_script(
     eng.on_round = on_round
     host = Host(
         act=lambda a: eng.apply(ego_eid, a).moved,
-        observe=lambda: NavObs(observe(world, ego_eid), goal),
-        yield_=lambda v: yielded.append(v.observation.to_dict()),
+        observe=lambda: observe(world, ego_eid),
+        yield_=lambda v: yielded.append(v.to_dict()),
     )
     interp = Interpreter(host)
 

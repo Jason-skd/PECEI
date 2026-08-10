@@ -36,6 +36,17 @@ class Attr(BaseModel):
     attr: str
 
 
+class At(BaseModel):
+    # Cell lookup in the egocentric camera frame: ``ob.at(dx, dy)`` -> a cell,
+    # whose ``is_X`` predicates / ``ctype`` can then be read. dx/dy are int
+    # expressions in canonical offsets (+x = the observer's gaze; (0,0) = self).
+    # Unseen offsets yield an empty cell, so every predicate is safe.
+    kind: Literal["at"] = "at"
+    obj: "Expr"
+    dx: "Expr"
+    dy: "Expr"
+
+
 class Compare(BaseModel):
     kind: Literal["compare"] = "compare"
     op: Literal["==", "!=", "<", ">", "<=", ">="]
@@ -73,11 +84,11 @@ class Beat(BaseModel):
 
 
 Expr = Annotated[
-    Union[Lit, Var, Attr, Compare, BoolOp, Act, Beat],
+    Union[Lit, Var, Attr, At, Compare, BoolOp, Act, Beat],
     Field(discriminator="kind"),
 ]
 
-for _m in (Lit, Var, Attr, Compare, BoolOp, Act, Beat):
+for _m in (Lit, Var, Attr, At, Compare, BoolOp, Act, Beat):
     _m.model_rebuild()
 
 

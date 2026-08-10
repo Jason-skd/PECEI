@@ -5,7 +5,8 @@ Infers a type tag per variable (bool / obs / cell / str / int / void) and enforc
     variable" rule — the schema already made it a bare name, not an expression);
   * ``beat(OBSERVE)`` is only legal as the direct RHS of an Assign
     ("observe must be caught in a variable");
-  * attribute navigation matches the object type (obs.front -> cell; cell.is_fire -> bool; ...).
+  * cell access is ``ob.at(dx, dy)`` (an int-indexed lookup in the egocentric
+    camera frame) -> ``cell``; ``cell.is_fire`` etc. -> ``bool``; ``cell.ctype`` -> ``str``.
 """
 from __future__ import annotations
 
@@ -13,6 +14,7 @@ from .ast_nodes import (
     Act,
     Assign,
     Attr,
+    At,
     BoolOp,
     Beat,
     BeatOp,
@@ -31,7 +33,6 @@ class CompileError(Exception):
     """A program failed compile-time type/structure checking."""
 
 
-OBS_DIRS = {"front", "left", "right", "back", "here"}
 CELL_BOOLS = {
     "is_fire", "is_water", "is_stone", "is_wood", "is_metal",
     "is_wheel", "is_brain", "is_empty", "is_blocked", "is_goal",
@@ -108,13 +109,17 @@ def _expr(e, env: dict[str, str]) -> str:
         return "bool"
     if isinstance(e, Attr):
         ot = _expr(e.obj, env)
-        if ot == "obs" and e.attr in OBS_DIRS:
-            return "cell"
         if ot == "cell" and e.attr in CELL_BOOLS:
             return "bool"
         if ot == "cell" and e.attr in CELL_STR:
             return "str"
         raise CompileError(f"no attribute {e.attr!r} on {ot}")
+    if isinstance(e, At):
+        if _expr(e.obj, env) != "obs":
+            raise CompileError("at(...) expects an observation")
+        if _expr(e.dx, env) != "int" or _expr(e.dy, env) != "int":
+            raise CompileError("at(dx, dy) offsets must be int")
+        return "cell"
     if isinstance(e, Compare):
         _expr(e.left, env)
         _expr(e.right, env)

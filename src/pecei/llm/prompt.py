@@ -25,16 +25,21 @@ PLAN_TOOL_DESCRIPTION = (
     "  act(FORWARD|BACKWARD|TURNLEFT|TURNRIGHT)  # MOVE — the ONLY valid act args\n"
     "  ob = beat(OBSERVE)                        # sense now; MUST assign to a variable\n"
     "  beat(YIELD, ob)                           # report an observation (fed back to you)\n"
-    "  b = ob.front.is_blocked                   # bool predicate\n"
+    "  b = ob.at(dx, dy).is_blocked              # bool predicate on the cell at (dx,dy)\n"
     "  if <bool_var>: ... else: ...              # condition MUST be a bare bool variable\n"
     "  while <bool_var>: ...                     # repeat while a bool var is True; re-sense in the body\n"
     "  for i in range(<int>): ...                # bounded repeat; <int> is a literal/int var; index var optional\n"
     "TWO VERBS, never mix their arguments: `act` takes ONLY a movement "
     "(FORWARD/BACKWARD/TURNLEFT/TURNRIGHT); `beat` takes ONLY OBSERVE or YIELD. "
-    "So `act(YIELD)` and `beat(FORWARD)` are ALWAYS wrong. RULE: an if-condition "
-    "is a bool *variable name* (string), never an expression; compute any "
-    "predicate into a bool variable first. beat(OBSERVE) must be assigned to a "
-    "variable before its attributes are used."
+    "So `act(YIELD)` and `beat(FORWARD)` are ALWAYS wrong. "
+    "PERCEPTION: ob.at(dx, dy) reads the cell at camera offset (dx, dy) — the "
+    "frame is egocentric: +x is your gaze, (0, 0) is your own cell. A `goal` "
+    "component, when its cell is in view, sits at some (dx, dy). Cell predicates: "
+    "is_goal is_blocked is_empty is_fire is_water is_stone is_wood is_metal "
+    "is_wheel is_brain, plus .ctype (a string). Unseen offsets read as empty. "
+    "RULE: an if-condition is a bool *variable name* (string), never an "
+    "expression; compute any predicate into a bool variable first. beat(OBSERVE) "
+    "must be assigned to a variable before its attributes are used."
 )
 
 # The author's system prompt lives in a co-located markdown file so it can be
@@ -66,8 +71,16 @@ def _fmt_obs(y: dict) -> str:
     cells = y.get("cells", {})
     if not cells:
         return ""
-    body = ", ".join(f"{k}:{'/'.join(v.get('types') or ['empty'])}" for k, v in cells.items())
-    return f"facing {y.get('orientation')} at {y.get('anchor')}: {body}"
+
+    def _key(item):
+        dx, dy = item[0].split(",")
+        return (int(dx), int(dy))
+
+    body = ", ".join(
+        f"{k}:{'/'.join(v.get('types') or ['empty'])}"
+        for k, v in sorted(cells.items(), key=_key)
+    )
+    return f"view (+x = your gaze): {body}"
 
 
 def render_user(turn: TurnInput) -> str:
@@ -78,7 +91,6 @@ def render_user(turn: TurnInput) -> str:
 
     seed = turn.seed_observation
     if seed:
-        lines.append(f"goal: {seed.get('goal')}")
         s = _fmt_obs(seed)
         if s:
             lines.append(f"seed observation: {s}")

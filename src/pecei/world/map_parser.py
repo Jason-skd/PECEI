@@ -61,13 +61,22 @@ class MapSpec(BaseModel):
         return [spec.build() for spec in self.entities]
 
     def build_world(self) -> "World":
-        """Build a World (canonical mutable state) with all entities placed."""
+        """Build a World (canonical mutable state) with all entities placed.
+
+        The goal is stamped into its cell as a GOAL marker occupant so the
+        observer perceives it through the normal ctype channel (it appears in
+        the FOV exactly when the goal cell is visible). ``world.goal`` keeps the
+        bare coordinate for engine internals (at_goal / render / Dijkstra).
+        """
+        from .component import Component
         from .world import World
 
-        world = World.empty(self.width, self.height,
-                            goal=tuple(self.goal) if self.goal else None)
+        goal = tuple(self.goal) if self.goal else None
+        world = World.empty(self.width, self.height, goal=goal)
         for spec in self.entities:
             world.add(spec.build())
+        if goal is not None:
+            world.grid.stamp(goal[0], goal[1], "goal", Component.of(ComponentType.GOAL))
         return world
 
 

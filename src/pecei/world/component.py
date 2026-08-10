@@ -24,6 +24,7 @@ class ComponentType(str, Enum):
     WHEEL = "wheel"
     BRAIN = "brain"
     METAL = "metal"
+    GOAL = "goal"
 
 
 # Per-type default attributes. Keys are the loose trait/state names from the
@@ -37,7 +38,24 @@ _DEFAULT_ATTRS: dict[ComponentType, dict[str, Any]] = {
     ComponentType.WHEEL: {"weight": 1.0, "buoyancy": 0.0, "burn": False, "wet": False, "fireproof": False},
     ComponentType.BRAIN: {"weight": 0.5, "buoyancy": 0.0, "burn": False, "wet": False, "fireproof": False},
     ComponentType.METAL: {"weight": 2.0, "buoyancy": 0.0, "burn": False, "wet": False, "fireproof": True},
+    # GOAL is a non-physical marker: it occupies the goal cell so the observer
+    # can perceive it through the same ctype channel as any other component, but
+    # it has no weight and never blocks movement (it is NOT in Grid._SOLID).
+    ComponentType.GOAL: {"weight": 0.0, "buoyancy": 0.0, "burn": False, "wet": False, "fireproof": True},
 }
+
+
+# Component types that physically block movement. The single source of truth —
+# shared by Grid.is_blocked (collision) and CellView.is_blocked (perception) so
+# the agent's predicate can never disagree with the world. Liquids (water) and
+# fire are non-blocking terrain; GOAL is a non-physical marker.
+SOLID: frozenset[ComponentType] = frozenset({
+    ComponentType.STONE,
+    ComponentType.METAL,
+    ComponentType.WOOD,
+    ComponentType.WHEEL,
+    ComponentType.BRAIN,
+})
 
 
 @dataclass

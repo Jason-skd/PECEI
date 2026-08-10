@@ -25,6 +25,7 @@ COLOR: dict[ComponentType, tuple[int, int, int]] = {
     ComponentType.WHEEL: (70, 72, 80),
     ComponentType.BRAIN: (214, 57, 128),
     ComponentType.METAL: (178, 182, 196),
+    ComponentType.GOAL: (96, 220, 120),
 }
 
 LABEL: dict[ComponentType, str] = {
@@ -35,4 +36,5 @@ LABEL: dict[ComponentType, str] = {
     ComponentType.WHEEL: "o",
     ComponentType.BRAIN: "@",
     ComponentType.METAL: "m",
+    ComponentType.GOAL: "G",
 }
