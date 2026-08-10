@@ -1,0 +1,40 @@
+# 08 brittle corridor — soak trap before the goal. 20x15. ego(3,1)EAST -> goal(18,1).
+# Metal cluster at (5,1)-(6,2); water at (8,2) soaks the ego; wood/fire column at
+# x=8 forces a choice: burn through wood (costs steps) or detour. Do NOT touch
+# metal while brittle.
+width: 20
+height: 15
+goal: [18, 1]
+entities:
+  - name: ego
+    anchor: [3, 1]
+    orientation: EAST
+    is_ego: true
+    components:
+      - { offset: [0, 0], type: wheel }
+      - { offset: [0, 1], type: metal }
+      - { offset: [0, 2], type: brain }
+  # metal cluster (lethal while brittle)
+  - name: metal_cluster
+    anchor: [5, 1]
+    components:
+      - { offset: [0, 0], type: metal }
+      - { offset: [1, 0], type: metal }
+      - { offset: [1, 1], type: metal }
+  # water soak point
+  - name: water1
+    anchor: [8, 2]
+    components:
+      - { offset: [0, 0], type: water }
+  # wooden obstacles along the column
+  - name: wood_column
+    anchor: [8, 4]
+    components:
+      - { offset: [0, 0], type: wood }
+      - { offset: [0, 2], type: wood }
+      - { offset: [0, 6], type: wood }
+  # fire cell further down the column
+  - name: fire1
+    anchor: [8, 8]
+    components:
+      - { offset: [0, 0], type: fire }

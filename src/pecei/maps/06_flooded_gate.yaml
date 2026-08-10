@@ -1,0 +1,39 @@
+# 06 flooded gate — water + metal brittle trap. 15x10. ego(3,1)EAST -> goal(13,1).
+# Water at (9,3) soaks the ego; soaked + metal body => brittle. The metal wall at
+# column 11 is lethal while brittle (BRITTLE_FAILURE). Dry route avoids the trap.
+width: 15
+height: 10
+goal: [13, 1]
+entities:
+  - name: ego
+    anchor: [3, 1]
+    orientation: EAST
+    is_ego: true
+    components:
+      - { offset: [0, 0], type: wheel }
+      - { offset: [0, 1], type: metal }
+      - { offset: [0, 2], type: brain }
+  # fire on the dry route
+  - name: fire1
+    anchor: [4, 3]
+    components:
+      - { offset: [0, 0], type: fire }
+  # water soaks the ego -> brittle metal
+  - name: water1
+    anchor: [9, 3]
+    components:
+      - { offset: [0, 0], type: water }
+  # wooden obstacle
+  - name: wood1
+    anchor: [6, 1]
+    components:
+      - { offset: [0, 0], type: wood }
+  # metal wall: lethal to touch while brittle
+  - name: metal_wall
+    anchor: [11, 1]
+    components:
+      - { offset: [0, 0], type: metal }
+      - { offset: [0, 4], type: metal }
+      - { offset: [0, 5], type: metal }
+      - { offset: [0, 6], type: metal }
+      - { offset: [0, 7], type: metal }

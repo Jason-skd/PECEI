@@ -12,6 +12,13 @@ from pecei.world.actions import ActionResult, ActionType, apply_action
 from pecei.world.world import World
 
 
+class BrittleFailure(RuntimeError):
+    """Raised when a brittle ego touches a metal cell (fatal interaction).
+
+    The run must stop with Result.BRITTLE_FAILURE rather than continue.
+    """
+
+
 @dataclass
 class RoundEngine:
     world: World
@@ -21,12 +28,21 @@ class RoundEngine:
     on_round: Callable[[int, str, ActionType, ActionResult], None] | None = None
 
     def apply(self, eid: str, action: ActionType) -> ActionResult:
-        """Apply one action = one round (action resolves, then environment ticks)."""
+        """Apply one action = one round (action resolves, then environment ticks).
+
+        A fatal interaction (brittle ego touching metal) raises
+        :class:`BrittleFailure`; active statuses (burning/soaked/brittle) cost
+        extra steps, which are added to the round counter.
+        """
         if self.time_exceeded:
             raise RuntimeError(f"round budget {self.round_budget} exhausted")
         res = apply_action(self.world, eid, action)
-        self.world.tick_environment()
-        self.round += 1
+        if res.failed:
+            raise BrittleFailure(
+                f"brittle ego touched metal on {action.value} (round {self.round + 1})"
+            )
+        extra = self.world.tick_environment()
+        self.round += 1 + extra
         if self.on_round is not None:
             self.on_round(self.round, eid, action, res)
         return res

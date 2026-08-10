@@ -2,6 +2,7 @@
 
 Per the design:
     result: SUCCESS | COMPILE_ERROR | ROUND_LIMIT_EXCEED | ENERGY_RUN_OUT | SCRIPT_ENDED
+            | BRITTLE_FAILURE
     (ENERGY deferred)
     failure_snapshot (nullable): pos, current_state (ego entity graph), complexity
     yielded: list of observation snapshots the actor chose to report
@@ -23,6 +24,7 @@ class Result(str, Enum):
     ROUND_LIMIT_EXCEED = "ROUND_LIMIT_EXCEED"
     ENERGY_RUN_OUT = "ENERGY_RUN_OUT"  # reserved (energy budget deferred)
     SCRIPT_ENDED = "SCRIPT_ENDED"      # body fully executed, budget remaining, goal not reached
+    BRITTLE_FAILURE = "BRITTLE_FAILURE"  # brittle ego touched a metal cell (fatal)
 
 
 class FailureSnapshot(BaseModel):

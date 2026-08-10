@@ -78,3 +78,25 @@ To detour around an obstacle, sense the cell ahead and turn when blocked, e.g.
 `ahead = ob.at(1, 0); if ahead.is_blocked: act(TURNRIGHT) else: act(FORWARD)` —
 but remember a `while` loop must always be able to terminate (its predicate must
 eventually flip), or it hits the round limit.
+
+## 5. Terrain effects & your body state
+
+Terrain cells have material effects on you (your body is wheel/metal/brain):
+
+- **fire** (`is_fire`): standing on fire ignites you -> `burning`. While burning
+  you destroy any `wood` you touch (wood stops blocking), but each active status
+  costs **+1 extra round** per round.
+- **water** (`is_water`): standing on water makes you `soaked` and quenches
+  burning immediately.
+- **metal** (`is_metal`): harmless normally. BUT if you are **soaked**, your
+  metal part becomes **brittle** — touching a metal cell while brittle is a
+  **fatal failure** (`BRITTLE_FAILURE`): the run stops. Never walk into metal
+  while wet.
+- **wood** (`is_wood`): a solid obstacle — unless you are burning, in which case
+  you burn through it.
+
+Your own status is in `ob.ego_status` (dict): `burning`, `soaked`, `brittle`
+bools with remaining-round counters (`burning_left`, `soaked_left`, `brittle_left`).
+Statuses wear off after a few rounds. `ego_status` is present in every
+observation you take, so check it before entering risky terrain.
+

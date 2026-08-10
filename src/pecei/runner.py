@@ -10,15 +10,15 @@ after it stops.
 Stop reasons: ``SUCCESS`` (goal reached) | ``COMPILE_ERROR`` (script didn't
 compile — bad AST or type error; message fed back) | ``ROUND_LIMIT_EXCEED``
 (budget) | ``ENERGY_RUN_OUT`` (reserved) | ``SCRIPT_ENDED`` (body fully executed,
-budget remaining, goal not reached). ``world_at_step`` reconstructs ground truth
-for the replay viewer.
+budget remaining, goal not reached) | ``BRITTLE_FAILURE`` (brittle ego touched a
+metal cell). ``world_at_step`` reconstructs ground truth for the replay viewer.
 """
 from __future__ import annotations
 
 from dataclasses import dataclass
 
 from pecei.action import BudgetExceeded, CompileError, Host, Interpreter, pretty
-from pecei.engine import RoundEngine
+from pecei.engine import BrittleFailure, RoundEngine
 from pecei.infra import FailureSnapshot, Result, Trace, TraceEvent, build_report
 from pecei.llm import Directive, Feedback, LLMProvider, TurnInput
 from pecei.llm.prompt import load_system_prompt, render_user
@@ -125,6 +125,8 @@ def run_script(
             interp.run(program)                    # runs type_check first (B-layer)
         except CompileError as e:
             compile_error = str(e)                 # B-layer: well-formed AST, type error
+        except BrittleFailure:
+            stopped_by = "brittle"      # brittle ego touched metal (fatal interaction)
         except RuntimeError:
             stopped_by = "budget"        # round budget exhausted mid-script (eng.apply)
         except BudgetExceeded:
@@ -137,6 +139,8 @@ def run_script(
         result = Result.COMPILE_ERROR              # script didn't compile (A or B layer)
     elif program is None:
         result = Result.SCRIPT_ENDED               # author gave no script / empty body
+    elif stopped_by == "brittle":
+        result = Result.BRITTLE_FAILURE            # brittle ego touched a metal cell
     elif stopped_by == "budget":
         result = Result.ROUND_LIMIT_EXCEED
     else:
@@ -173,11 +177,13 @@ def run_script(
 def world_at_step(map_path, trace: Trace, step: int) -> World:
     """Reconstruct the ground-truth World at replay ``step`` (0..len(trace)).
 
-    Replays the ego's recorded actions from a fresh map load. Valid because MVP
-    environment ticks are a no-op and only the ego moves.
+    Replays the ego's recorded actions from a fresh map load, applying the
+    environment tick after each action so effects (burning/soaked/brittle,
+    wood destruction) match the live run.
     """
     world = load_world(map_path)
     for i in range(min(step, len(trace.events))):
         ev = trace.events[i]
         apply_action(world, ev.actor, ActionType(ev.action))
+        world.tick_environment()
     return world

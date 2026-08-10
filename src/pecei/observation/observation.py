@@ -95,6 +95,9 @@ class Observation:
     cells: dict[tuple[int, int], CellView]
     vision_range: int
     half_angle: float
+    # The ego's own material status (burning / soaked / brittle) as perceived by
+    # the observer itself. Mirrors World.ego_status; None for non-ego observers.
+    ego_status: dict | None = None
 
     def at(self, dx: int, dy: int) -> CellView:
         """Perceived cell at canonical offset (dx, dy).
@@ -105,11 +108,14 @@ class Observation:
         return self.cells.get((dx, dy)) or _empty_cell()
 
     def to_dict(self) -> dict:
-        return {
+        d = {
             "vision_range": self.vision_range,
             "half_angle": self.half_angle,
             "cells": {f"{dx},{dy}": cv.to_dict() for (dx, dy), cv in self.cells.items()},
         }
+        if self.ego_status is not None:
+            d["ego_status"] = self.ego_status
+        return d
 
 
 def _empty_cell() -> CellView:
@@ -176,7 +182,8 @@ def observe(
     for (x, y) in ent.placements():
         cells.setdefault(_rotate((x - ox, y - oy), steps), _view(grid, x, y))
 
-    return Observation(cells=cells, vision_range=rng, half_angle=ha)
+    ego_status = world.ego_status.to_dict() if world.ego is not None and observer_eid == world.ego.eid else None
+    return Observation(cells=cells, vision_range=rng, half_angle=ha, ego_status=ego_status)
 
 
 def _view(grid: Grid, x: int, y: int) -> CellView:
