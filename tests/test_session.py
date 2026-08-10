@@ -38,7 +38,9 @@ def test_session_roundtrip(tmp_path):
     assert s2.cycles[0].stop_reason is Result.SUCCESS
 
 
-def test_run_one_cycle_is_one_request_and_snowball_grows():
+def test_run_one_cycle_is_one_request_and_snowball_lags():
+    # The last cycle is fully represented in `feedback` (incl. its script), so the
+    # snowball carries only the EARLIER cycles — it lags by one.
     s = Session(map=str(EXAMPLE02), provider="mock", round_budget=50)
 
     p1 = _Count()
@@ -49,8 +51,13 @@ def test_run_one_cycle_is_one_request_and_snowball_grows():
     p2 = _Count()
     s.run_one_cycle(p2)
     assert p2.n == 1 and p2.has_feedback              # cycle 2: feedback present, one request
-    assert p2.snowball_len == 1                        # snowball = the 1 prior cycle
+    assert p2.snowball_len == 0                        # the 1 prior cycle is IN feedback
     assert len(s.cycles) == 2
+
+    p3 = _Count()
+    s.run_one_cycle(p3)
+    assert p3.snowball_len == 1                        # cycle 1 now in snowball; cycle 2 in feedback
+    assert len(s.cycles) == 3
 
 
 def test_run_one_cycle_records_prompt():

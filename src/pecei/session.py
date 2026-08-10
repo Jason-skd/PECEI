@@ -100,6 +100,7 @@ class Session(BaseModel):
         return Feedback(
             stop_reason=last.stop_reason,
             rounds_used=last.rounds,
+            script=last.script,
             yielded=yielded,
             failure_snapshot=last.failure_snapshot,
             compile_error=last.compile_error,
@@ -116,7 +117,10 @@ class Session(BaseModel):
         run = run_script(
             self.map, provider,
             feedback=self.last_feedback(),
-            snowball=self.cycle_summaries(),
+            # The last cycle is fully represented in feedback now (incl. its
+            # script), so the snowball carries only the EARLIER cycles — drop the
+            # last entry to avoid showing the previous script twice.
+            snowball=self.cycle_summaries()[:-1],
             instructions=self.instructions,
             round_budget=self.round_budget,
         )

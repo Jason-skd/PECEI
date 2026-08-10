@@ -102,10 +102,14 @@ def test_session_same_source_no_duplicate_yielded(tmp_path):
     assert Trace.read(rec.trace_path).events              # trace is replayable
 
 
-def test_snowball_grows_across_cycles(tmp_path):
+def test_snowball_lags_one_cycle_because_last_is_in_feedback(tmp_path):
+    # The last cycle lives in full detail in `feedback`; the snowball carries
+    # only the EARLIER cycles, so it lags by one (only grows from cycle 3 on).
     prov = _Count()
     s = Session(map=str(CORRIDOR), provider="mock", round_budget=50)
     s.run_one_cycle(prov, trace_dir=None)
-    assert prov.snowball_lens == [0]
+    assert prov.snowball_lens == [0]                    # cycle 1: nothing prior
     s.run_one_cycle(prov, trace_dir=None)
-    assert prov.snowball_lens == [0, 1]
+    assert prov.snowball_lens == [0, 0]                 # cycle 2: the 1 prior is IN feedback
+    s.run_one_cycle(prov, trace_dir=None)
+    assert prov.snowball_lens == [0, 0, 1]              # cycle 3: cycle 1 in snowball, 2 in feedback

@@ -1,8 +1,10 @@
 """Prompt rendering shared by all providers (keeps adapters thin + consistent).
 
-The author is blind to the live simulation: ``render_user`` shows only the static
-map, the previous cycle's feedback (yields + stop-report), and the snowball —
-never a live per-round observation.
+The author is blind to the live simulation AND to the full map: ``render_user``
+shows only a PARTIAL seed observation from the start pose (the 90° FOV cone),
+the previous cycle's feedback (the script + its yields + stop-report), and the
+snowball of earlier cycles — never the god-view layout, never a live per-round
+observation.
 """
 from __future__ import annotations
 
@@ -72,21 +74,20 @@ def render_user(turn: TurnInput) -> str:
     if turn.instructions:
         lines.append(f"INSTRUCTIONS (authoritative): {turn.instructions}")
 
-    md = turn.map_desc
-    if md:
-        ego = md.get("ego") or {}
-        lines.append(
-            f"map: {md.get('width')}x{md.get('height')}, goal {md.get('goal')}, "
-            f"start {ego.get('anchor')} facing {ego.get('orientation')}.")
-        ents = md.get("entities")
-        if ents:
-            lines.append("layout (anchor: types):")
-            for e in ents:
-                lines.append(f"  {e.get('anchor')}: {','.join(e.get('types') or []) or 'empty'}")
+    seed = turn.seed_observation
+    if seed:
+        lines.append(f"goal: {seed.get('goal')}")
+        s = _fmt_obs(seed)
+        if s:
+            lines.append(f"seed observation: {s}")
 
     fb = turn.feedback
     if fb:
         lines.append(f"last_cycle stopped: {fb.stop_reason.value} after {fb.rounds_used} rounds.")
+        if fb.script:
+            lines.append("  script:")
+            for ln in str(fb.script).splitlines():
+                lines.append(f"    {ln}")
         if fb.compile_error:
             lines.append(f"  compile error: {fb.compile_error}")
         if fb.failure_snapshot:

@@ -43,25 +43,29 @@ class ScriptRun:
         return Feedback(
             stop_reason=self.stop_reason,
             rounds_used=self.rounds,
+            script=self.program,
             yielded=list(self.yielded),
             failure_snapshot=self.failure_snapshot,
             compile_error=self.compile_error,
         )
 
 
-def map_desc(world: World) -> dict:
-    """Static puzzle description fed to the author every cycle (never live state)."""
+def seed_observation(world: World) -> dict:
+    """The author's PARTIAL start-pose view: the 90° FOV cone from the ego's
+    start anchor (``observe(...).to_dict()``), plus the goal coordinate as task
+    framing. NOT a god-view map — walls/water/fire beyond the cone are withheld;
+    the author must discover them by having its script ``beat(OBSERVE)`` /
+    ``beat(YIELD)`` and reading the yields fed back next cycle.
+
+    Given every cycle: each ``decide()`` is a stateless single LLM call, and the
+    start pose is identical every cycle (map reloads fresh), so this is the
+    author's *persistent* memory of its starting perception — equivalent to a
+    one-time seed replayed each turn, not new information.
+    """
     ego = world.ego
-    return {
-        "width": world.grid.width,
-        "height": world.grid.height,
-        "goal": list(world.goal) if world.goal else None,
-        "ego": {"anchor": list(ego.anchor), "orientation": ego.orientation.value} if ego else None,
-        "entities": [
-            {"anchor": list(e.anchor), "types": [c.ctype.value for c in e.components.values()]}
-            for e in world.entities.values()
-        ],
-    }
+    obs = observe(world, ego.eid).to_dict()
+    obs["goal"] = list(world.goal) if world.goal else None
+    return obs
 
 
 def run_script(
@@ -105,7 +109,7 @@ def run_script(
     turn = TurnInput(
         directive=Directive.PLAN,
         instructions=instructions,
-        map_desc=map_desc(world),
+        seed_observation=seed_observation(world),
         feedback=feedback,
         snowball=snowball or [],
     )

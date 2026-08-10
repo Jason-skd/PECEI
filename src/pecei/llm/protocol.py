@@ -31,6 +31,7 @@ class Feedback:
 
     stop_reason: Result                                      # SUCCESS | COMPILE_ERROR | ROUND_LIMIT_EXCEED | ENERGY_RUN_OUT | SCRIPT_ENDED
     rounds_used: int
+    script: str = ""                                         # pretty(program) the author wrote this cycle ("" if none / parse failed)
     yielded: list[dict] = field(default_factory=list)        # observations the script beat(YIELD)'d
     failure_snapshot: FailureSnapshot | None = None
     compile_error: str | None = None                         # set iff stop_reason is COMPILE_ERROR
@@ -41,7 +42,7 @@ class Feedback:
 class TurnInput:
     directive: Directive = Directive.PLAN
     instructions: str | None = None                          # authoritative, author-immutable (e.g. experiment k/N, role)
-    map_desc: dict = field(default_factory=dict)             # static puzzle: size, goal, ego pose, entities
+    seed_observation: dict = field(default_factory=dict)     # PARTIAL start-pose view (90° cone), NOT the full map; the rest is learned via yields
     feedback: Feedback | None = None                         # previous cycle's outcome (None on first cycle)
     snowball: list[dict] = field(default_factory=list)       # prior cycles: {index, script, stop_reason, rounds, ...}
     extra: str | None = None

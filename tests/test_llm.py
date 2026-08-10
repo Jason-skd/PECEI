@@ -18,25 +18,31 @@ def test_mock_decide_returns_complete_script():
     assert "assign" in kinds and "expr" in kinds   # observe + acts/yields
 
 
-def test_turninput_shape_is_feedback_not_live_observation():
+def test_turninput_shape_is_seed_observation_not_live_or_godview():
     fields = {f.name for f in dataclasses.fields(TurnInput)}
-    assert {"map_desc", "feedback", "snowball", "instructions"} <= fields
-    assert "observation" not in fields              # live per-round observation removed
+    assert {"seed_observation", "feedback", "snowball", "instructions"} <= fields
+    assert "map_desc" not in fields                 # god-view map removed
+    assert "observation" not in fields              # no LIVE per-round observation field
 
 
-def test_render_user_shows_static_map_feedback_and_instructions():
+def test_render_user_shows_seed_observation_feedback_and_instructions():
     turn = TurnInput(
         instructions="experiment session 2 of 4: map 'maze'",
-        map_desc={"width": 6, "height": 5, "goal": [6, 2],
-                  "ego": {"anchor": [3, 2], "orientation": "EAST"}, "entities": []},
+        seed_observation={
+            "anchor": [3, 2], "orientation": "EAST",
+            "cells": {"1,0": {"types": ["stone"]}, "1,1": {"types": []}},
+            "goal": [6, 2],
+        },
         feedback=Feedback(stop_reason=Result.SCRIPT_ENDED, rounds_used=1),
     )
     out = render_user(turn)
     assert "DIRECTIVE: PLAN" in out
     assert "INSTRUCTIONS" in out and "2 of 4" in out
-    assert "map:" in out and "goal [6, 2]" in out
+    assert "goal: [6, 2]" in out
+    assert "seed observation:" in out and "facing EAST at [3, 2]" in out
+    assert "1,0:stone" in out                         # partial cone cell rendered
+    assert "layout" not in out and "map:" not in out  # god-view layout gone
     assert "last_cycle stopped: SCRIPT_ENDED" in out
-    assert "Visible cells" not in out               # no live observation leak
 
 
 def test_parse_program_raises_on_malformed_tool_call():
@@ -59,16 +65,18 @@ def test_parse_program_raises_on_malformed_tool_call():
 
 
 def test_render_user_shows_compile_error_in_feedback_and_snowball():
-    # feedback path
+    # feedback path — the previous script rides along (B-layer: parsed OK, type error)
     turn = TurnInput(
         feedback=Feedback(
             stop_reason=Result.COMPILE_ERROR, rounds_used=0,
+            script="act(YIELD)",
             compile_error="at body.7.expr.expr.act.action: bad action 'YIELD'",
         ),
     )
     out = render_user(turn)
     assert "COMPILE_ERROR" in out
     assert "compile error:" in out and "YIELD" in out
+    assert "script:" in out and "act(YIELD)" in out    # last cycle's script in feedback
 
     # snowball path
     turn = TurnInput(snowball=[{
