@@ -1,15 +1,13 @@
-# 01 corridor — baseline solvability. 10x6. 3-cell vertical ego (wheel=front,
-# metal, brain=tail) faces EAST at anchor (4,3), body trailing west to (2,3).
-# Goal at (8,3). Straight east, no obstacles. Teaches: loop forward until goal.
+# 01 corridor — baseline solvability. 10x6. Single-cell ego (brain) faces EAST
+# at (3,3). Goal at (8,3). Straight east, no obstacles. Teaches: loop forward
+# until goal.
 width: 10
 height: 6
 goal: [8, 3]
 entities:
   - name: ego
-    anchor: [4, 3]
+    anchor: [3, 3]
     orientation: EAST
     is_ego: true
     components:
-      - { offset: [0, 0], type: wheel }
-      - { offset: [0, 1], type: metal }
-      - { offset: [0, 2], type: brain }
+      - { offset: [0, 0], type: brain }

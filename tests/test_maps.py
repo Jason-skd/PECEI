@@ -133,11 +133,9 @@ def test_maps_have_ego_and_goal():
         assert w.ego is not None and w.goal is not None
 
 
-def test_maps_use_three_cell_body():
-    """All four game maps use the 3-cell rigid ego (wheel/metal/brain)."""
+def test_maps_use_single_cell_body():
+    """All four game maps use the single-cell ego (brain only)."""
     for m in (CORRIDOR, ONE_WALL, MAZE, FIRE_WOOD):
         w = load_world(str(m))
         ctypes = {c.ctype for c in w.ego.components.values()}
-        assert ctypes == {ComponentType.WHEEL, ComponentType.METAL, ComponentType.BRAIN}, (
-            f"{m.name} ego should be wheel/metal/brain, got {ctypes}"
-        )
+        assert ctypes == {ComponentType.BRAIN}, f"{m.name} ego should be brain-only, got {ctypes}"

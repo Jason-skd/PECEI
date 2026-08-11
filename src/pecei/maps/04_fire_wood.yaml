@@ -1,27 +1,24 @@
-# 04 fire+wood — terrain interaction. 12x9. 3-cell vertical ego faces EAST at
-# anchor (4,7), body trailing west along row 7. Goal at (10,4) is sealed inside
-# a stone room: the only non-stone side is the LEFT wall, a 4-cell WOOD column
-# at x=8 (rows 3-6). Stone is impassable, so the ONLY way in is to burn through
-# the wood — which requires being ignited. Fire sits at (5,6) on the direct
-# approach to the wood wall: the ego must steer to touch the fire, catch flame,
-# then ram the wood wall while still burning to enter the goal room. The room's
-# SE corner (11,7) is sealed so there is no back-door detour. Teaches: acquire
-# fire, then exploit fire+wood.
+# 04 fire+wood — terrain interaction. 12x9. Single-cell ego (brain) faces EAST
+# at (1,7). Goal at (10,4) is sealed inside a stone room: the only non-stone
+# side is the LEFT wall, a 4-cell WOOD column at x=8 (rows 3-6). Stone is
+# impassable, so the ONLY way in is to burn through the wood — which requires
+# being ignited. Fire sits at (5,6) on the approach: the ego must steer to
+# touch the fire, catch flame, then ram the wood wall while still burning to
+# enter the goal room. Teaches: acquire fire, then exploit fire+wood.
 width: 12
 height: 9
 goal: [10, 4]
 entities:
   - name: ego
-    anchor: [4, 7]
+    anchor: [1, 7]
     orientation: EAST
     is_ego: true
     components:
-      - { offset: [0, 0], type: wheel }
-      - { offset: [0, 1], type: metal }
-      - { offset: [0, 2], type: brain }
-  # fire cell on the approach to the wood wall — ignites the ego
+      - { offset: [0, 0], type: brain }
+  # fire cell on the approach to the wood wall — ignites the ego. Placed 2 steps
+  # from the wood so BURN_DURATION=3 survives the run into the wall.
   - name: fire1
-    anchor: [5, 6]
+    anchor: [6, 6]
     components:
       - { offset: [0, 0], type: fire }
   # top stone wall (row 2, cols 8-11)
@@ -32,7 +29,7 @@ entities:
       - { offset: [1, 0], type: stone }   # (9,2)
       - { offset: [2, 0], type: stone }   # (10,2)
       - { offset: [3, 0], type: stone }   # (11,2)
-  # right stone wall (col 11, rows 2-7) — sealed down to row 7
+  # right stone wall (col 11, rows 2-7)
   - name: room_right
     anchor: [11, 2]
     components:
