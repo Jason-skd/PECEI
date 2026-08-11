@@ -67,26 +67,52 @@ uv run pecei auto src/pecei/maps/02_one_wall.yaml --provider mock --budget 20
 # train a whole experiment (a folder of NN_slug maps), one session each, in order
 uv run pecei experiment src/pecei/maps --provider mock
 
+# warm-vs-cold comparison (Figure 1): train the warm arm on train_dir (shared
+# memory accumulates across those maps), then evaluate BOTH arms on test_dir —
+# the cold arm carries no memory. Writes compare/{warm_train,warm,cold}/ sessions
+# + comparison.json/.csv; --plot also renders grouped bar-chart PNGs.
+uv run pecei compare src/pecei/maps src/pecei/maps --provider mock --budget 20 --plot
+
 # replay a single epoch (one trace)
-uv run pecei replay src/pecei/maps/04_maze.yaml sessions/04_maze.traces/04_maze.c001.trace.jsonl
+uv run pecei replay src/pecei/maps/03_maze.yaml sessions/03_maze.traces/03_maze.c001.trace.jsonl
 
 # browse a session's epochs, pick one, replay it (or play-to-end)
-uv run pecei replay src/pecei/maps/04_maze.yaml --session sessions/04_maze.session.json
+uv run pecei replay src/pecei/maps/03_maze.yaml --session sessions/03_maze.session.json
 
 # render authored scripts (AST->text): one trace / a session / a whole experiment
-uv run pecei transcript sessions/04_maze.traces/04_maze.c001.trace.jsonl
-uv run pecei transcript --session sessions/04_maze.session.json
+uv run pecei transcript sessions/03_maze.traces/03_maze.c001.trace.jsonl
+uv run pecei transcript --session sessions/03_maze.session.json
 uv run pecei transcript --experiment sessions            # one <slug>.transcript.txt per session
-uv run pecei transcript --session sessions/04_maze.session.json --with-prompts --print
+uv run pecei transcript --session sessions/03_maze.session.json --with-prompts --print
 ```
 
-`auto` / `epoch` / `experiment` write per-cycle traces under `sessions/<map>.traces/` and, **by default, also dump a `sessions/<map>.transcript.txt`** (every cycle's script, one block each) when a session ends — pass `--no-transcript` to skip. The `transcript` command renders the same view on demand; it does no simulation, just surfaces the scripts already stored in the session/trace. Use `--provider anthropic` (or `openai` / `deepseek`) instead of `mock` once `.env` is set.
+`auto` / `epoch` / `experiment` / `compare` write per-cycle traces under `sessions/<map>.traces/` (or under the compare sub-dirs) and, **by default, also dump a `<map>.transcript.txt`** (every cycle's script, one block each) when a session ends — pass `--no-transcript` to skip. The `transcript` command renders the same view on demand; it does no simulation, just surfaces the scripts already stored in the session/trace. Use `--provider anthropic` (or `openai` / `deepseek`) instead of `mock` once `.env` is set.
+
+### `compare` — warm-vs-cold (Figure 1)
+
+The comparison runs the same test maps under two arms:
+
+- **warm** — first trains on `train_dir` with a *shared* `MemoryEvolution` (learned bans accumulate across all train maps), then evaluates on `test_dir` carrying that accumulated memory.
+- **cold** — evaluates on `test_dir` with `memory=None`; every map explored from scratch.
+
+Output layout (under `--out`, default `compare/`):
+
+```
+compare/
+├── warm_train/   # warm-arm training sessions (side-effect only)
+├── warm/         # warm-arm test sessions  (one <slug>.session.json per test map)
+├── cold/         # cold-arm test sessions
+├── comparison.json   # per-map {warm, cold} metrics side by side
+└── comparison.csv    # flat: one row per (map, arm)
+```
+
+Metrics per arm: `epochs_to_success` (cycles up to & including first SUCCESS), `total_rounds` (sum of rounds to that point), `solved`. Lower is better, so a learning prototype shows warm < cold. For the real experiment, wire a real provider so the warm arm's bans are distilled by an LLM (`--memory-model`, defaults to `--model`); with `mock` (or `--no-llm-memory`) memory compression falls back to a deterministic rule-based path. `--plot` renders `compare/comparison_epochs.png` + `comparison_rounds.png`.
 
 **Maps** (`src/pecei/maps/`, `NN_slug.yaml` = order + readable name):
 - `01_corridor` — straight east; baseline solvability.
 - `02_one_wall` — a stone column forces a detour (turning + branching).
-- `03_water_obstacle` — stone wall with a *passable* water gap (fire/water don't kill in the MVP; difficulty is geometric).
-- `04_maze` — two staggered walls; blind exploration.
+- `03_maze` — three staggered stone walls with alternating gaps; zig-zag + gap selection, blind exploration.
+- `04_fire_wood` — the goal is sealed in a stone room whose only enterable side is a wood wall; the ego must first touch fire to ignite, then burn through the wood (terrain interaction).
 
 All four are BFS-proven solvable, and naive "drive straight" fails on 02–04, so the author can't read the answer off the start.
 
@@ -108,6 +134,8 @@ world/  ──▶  observation/  ──▶  action/ (AST + interpreter)  ──�
    llm/ (protocol + adapters) ────────┤   render/ (headless renderer + assets)
                                       │
             runner/ ──▶  session/ ──▶  cli/ ──▶  replay/   experiment/   transcript/
+                                      │                       compare/  plotting/
+                                      └── memory/ (MemoryEvolution: ban accumulation + compression)
 ```
 
 - **world** — ground-truth grid + rigid multi-cell `Entity` (components: stone/wood/fire/water/wheel/brain/metal), YAML/JSON map parser.
@@ -116,9 +144,12 @@ world/  ──▶  observation/  ──▶  action/ (AST + interpreter)  ──�
 - **engine** — one action = one round + env tick; `at_goal` is the authoritative success check; budget-exhaustion raises.
 - **infra** — JSONL `Trace` (per-round truth + `program`/`llm_request`/`llm_response` + `yielded`), `MatchReport`/`Result`/`FailureSnapshot`, entity-aware Dijkstra `complexity`.
 - **llm** — `TurnInput{instructions, map_desc, feedback, snowball}` (no live observation), provider-agnostic adapters (`anthropic`/`openai`/`deepseek`/`mock`) behind a `Protocol`. Structured output via tool-use.
+- **memory** — `MemoryEvolution`: accumulates learned *bans* across sessions (the warm arm's carried experience) and compresses failures into bans via an LLM (or a deterministic rule-based fallback).
 - **runner** — `run_script`: one `decide()` per cycle, reloads the map (reset-per-script), runs to a stop, builds the stop-report. `world_at_step` reconstructs truth for replay.
 - **session** — snowballs `CycleRecord`s; the trace is the single source of truth (the session stores a summary + `trace_path`, yields are derived, not duplicated).
-- **experiment** — scans a `NN_slug` dir, trains each map as a session in order, injects "session k of N" via `instructions`.
+- **experiment** — scans a `NN_slug` dir, trains each map as a session in order, injects "session k of N" via `instructions`; threads an optional shared `memory` through every session.
+- **compare** — Figure-1 harness: reuses `run_experiment` to train the warm arm (shared memory) then evaluate both warm and cold arms on the test maps; extracts `epochs_to_success`/`total_rounds`/`solved` per arm, writes `comparison.json`/`.csv`. Pure orchestration — no map parsing or session loop reimplemented.
+- **plotting** — lazy-matplotlib grouped bar chart for a `ComparisonResult` (CVD-safe blue/orange: warm vs cold); only imported when `compare --plot` asks for it.
 - **replay** — epoch-based viewer with image tiles, session browser, play-to-end.
 - **transcript** — renders a session's authored scripts (AST→text) at epoch / session / experiment granularity; no simulation, just surfaces the scripts stored on each `CycleRecord`.
 
@@ -133,7 +164,7 @@ world/  ──▶  observation/  ──▶  action/ (AST + interpreter)  ──�
 
 ## Status
 
-The inner loop (generate → run → feedback → regenerate) is complete and tested (`uv run pytest -q`): mock closed-loop reaches the goal, traces are replayable, the epoch loop stops on success, `auto`/`experiment` orchestrate across maps. Roadmap's **middle loop** (Reflexion + skill atoms + shared memory + principle distillation) and **outer loop** (body regeneration) are scaffolded only — `Directive` carries `REFLECT`/`COMPRESS`/`STORE` placeholders for them — not yet implemented.
+The inner loop (generate → run → feedback → regenerate) is complete and tested (`uv run pytest -q`): mock closed-loop reaches the goal, traces are replayable, the epoch loop stops on success, `auto`/`experiment` orchestrate across maps, and the `compare` warm-vs-cold harness (Figure 1) drives a real `MemoryEvolution` (the *compress* stage — failure → IF/THEN/BECAUSE bans, with time-decay buffer + defrag) to produce metrics + charts. The roadmap's remaining middle-loop directives (`REFLECT`, `STORE`) and the **outer loop** (body regeneration) are scaffolded only — `Directive` carries the placeholders — not yet implemented.
 
 ## License
 
