@@ -52,6 +52,7 @@ class Host:
     act: Callable[[ActionType], bool]              # returns whether it moved
     observe: Callable[[], "Observation"]           # beat(OBSERVE) -> egocentric obs
     yield_: Callable[["Observation"], None]        # beat(YIELD, obs) -> report sink
+    visited: Callable[[], bool] = lambda: False    # beat(VISITED) -> has the ego's current cell been stepped on this run?
 
 
 class Interpreter:
@@ -107,6 +108,8 @@ class Interpreter:
         if isinstance(e, Beat):
             if e.op is BeatOp.OBSERVE:
                 return self.host.observe()
+            if e.op is BeatOp.VISITED:
+                return self.host.visited()
             self.host.yield_(self._eval(e.value, env))  # YIELD
             return None
         if isinstance(e, Act):

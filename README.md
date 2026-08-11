@@ -92,7 +92,7 @@ All four are BFS-proven solvable, and naive "drive straight" fails on 02–04, s
 
 ### Replay controls
 
-`←`/`→` (or `n`/`p`) step · `Home`/`End` jump · `PgUp`/`PgDn` switch epoch · `SPACE` play/pause · `c` (or the **play to end** button) play from the current epoch through to the end · drag the timeline bar · `q`/`ESC` quit. Tiles are Pillow-drawn sprites (`replay/assets/*.png`); the renderer falls back to color+shape blocks if they're missing.
+`←`/`→` (or `n`/`p`) step · `Home`/`End` jump · `PgUp`/`PgDn` switch epoch · `SPACE` play/pause · `c` (or the **play to end** button) play from the current epoch through to the end · drag the timeline bar · `q`/`ESC` quit. Tiles are sprites (`render/assets/*.png`); the renderer falls back to color+shape blocks if they're missing.
 
 ---
 

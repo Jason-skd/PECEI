@@ -4,12 +4,18 @@ Map files follow the ``NN_slug.yaml`` convention (two-digit order prefix); a
 directory of them forms an experiment. Each map trains as its own Session until
 SUCCESS or cycle budget; the session's authoritative ``instructions`` carry the
 experiment context ("this is session k of N: <slug>").
+
+When a shared ``MemoryEvolution`` is supplied (``memory=``), every cycle's
+feedback is remembered and its rendered context is injected into the next cycle
+— so the bans learned on earlier maps follow the agent onto later maps. That
+shared instance is the *warm-start* arm of the comparison experiment; the
+cold-start arm simply runs each map with ``memory=None``.
 """
 from __future__ import annotations
 
 import re
 from pathlib import Path
-from typing import NamedTuple
+from typing import Any, NamedTuple
 
 from pecei.llm.protocol import LLMProvider
 from pecei.session import Session, auto_session
@@ -47,9 +53,14 @@ def run_experiment(
     budget: int = 10,
     round_budget: int = 100,
     dump_transcript: bool = True,
+    memory: Any | None = None,
 ) -> list[Session]:
     """Train each map in ``directory`` as its own session, in order. Returns the
-    list of Sessions (each saved to ``out_dir/<slug>.session.json``)."""
+    list of Sessions (each saved to ``out_dir/<slug>.session.json``).
+
+    ``memory``: an optional shared ``MemoryEvolution`` threaded through every
+    session's cycles, so learned bans accumulate across the maps trained here.
+    """
     maps = parse_experiment(directory)
     total = len(maps)
     if total == 0:
@@ -69,7 +80,7 @@ def run_experiment(
         sess_path = out / f"{ref.slug}.session.json"
         trace_dir = out / f"{ref.slug}.traces"
         auto_session(sess, provider, sess_path, budget=budget, trace_dir=trace_dir,
-                     dump_transcript=dump_transcript)
+                     dump_transcript=dump_transcript, memory=memory)
         sessions.append(sess)
 
     solved = sum(1 for s in sessions if s.success_count > 0)

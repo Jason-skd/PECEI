@@ -92,10 +92,8 @@ def test_load_example_map_structure_and_ascii():
         assert occs, f"expected occupant at ({x},{y})"
         return occs[-1].component.ctype
 
-    # ego body (NORTH from anchor (1,1))
-    assert ctype(1, 1) is ComponentType.WHEEL
-    assert ctype(1, 2) is ComponentType.METAL
-    assert ctype(1, 3) is ComponentType.BRAIN
+    # ego body (single cell at anchor (1,1))
+    assert ctype(1, 1) is ComponentType.BRAIN
     # river
     assert ctype(3, 1) is ComponentType.WATER
     assert ctype(3, 2) is ComponentType.WATER
@@ -104,9 +102,9 @@ def test_load_example_map_structure_and_ascii():
 
     expected = "\n".join([
         ". . . . . .",
-        ". o . ~ . .",
-        ". m . ~ . .",
-        ". @ . . * .",
+        ". @ . ~ . .",
+        ". . . ~ . .",
+        ". . . . * .",
         ". . . . . .",
     ])
     assert grid.ascii() == expected

@@ -20,27 +20,23 @@ PROGRAM_SCHEMA = Program.model_json_schema()
 
 PLAN_TOOL_DESCRIPTION = (
     "Emit the agent's COMPLETE script for this cycle — a sequence of statements "
-    "that runs autonomously from the start until it stops. The script runs blind "
-    "(you receive no feedback until it stops). Statements:\n"
-    "  act(FORWARD|BACKWARD|TURNLEFT|TURNRIGHT)  # MOVE — the ONLY valid act args\n"
-    "  ob = beat(OBSERVE)                        # sense now; MUST assign to a variable\n"
-    "  beat(YIELD, ob)                           # report an observation (fed back to you)\n"
-    "  b = ob.at(dx, dy).is_blocked              # bool predicate on the cell at (dx,dy)\n"
-    "  if <bool_var>: ... else: ...              # condition MUST be a bare bool variable\n"
-    "  while <bool_var>: ...                     # repeat while a bool var is True; re-sense in the body\n"
-    "  for i in range(<int>): ...                # bounded repeat; <int> is a literal/int var; index var optional\n"
-    "TWO VERBS, never mix their arguments: `act` takes ONLY a movement "
-    "(FORWARD/BACKWARD/TURNLEFT/TURNRIGHT); `beat` takes ONLY OBSERVE or YIELD. "
-    "So `act(YIELD)` and `beat(FORWARD)` are ALWAYS wrong. "
-    "PERCEPTION: ob.at(dx, dy) reads the cell at camera offset (dx, dy) — the "
-    "frame is egocentric: +x is your gaze, (0, 0) is your own cell. A `goal` "
-    "component, when its cell is in view, sits at some (dx, dy). Cell predicates: "
+    "that runs blind until it stops. Statements:\n"
+    "  act(FORWARD|BACKWARD|TURNLEFT|TURNRIGHT)  # returns bool: True iff it happened\n"
+    "  ob = beat(OBSERVE)                        # sense; MUST assign\n"
+    "  seen = beat(VISITED)                      # bool: has the cell AHEAD been stepped on this run?\n"
+    "  beat(YIELD, ob)                           # report an observation\n"
+    "  c = ob.at(dx, dy)                         # cell at camera offset (dx,dy); +x=gaze,(0,0)=self; MUST assign\n"
+    "  b = c.is_goal                             # bool predicate; assign before use\n"
+    "  if <bool_var>: ... else: ...              # condition is a bare bool variable\n"
+    "  while <bool_var>: ...                     # repeat; re-sense in the body\n"
+    "  for i in range(<int>): ...                # bounded repeat\n"
+    "RULES: if/while take a bool VARIABLE name, never an expression. act takes "
+    "ONLY a movement; beat takes ONLY OBSERVE/YIELD/VISITED. beat(OBSERVE) and "
+    "beat(VISITED) must be assigned before use. beat(VISITED) is True when the "
+    "cell directly ahead has already been stepped on this run. Cell predicates: "
     "is_goal is_blocked is_empty is_fire is_water is_stone is_wood is_metal "
-    "is_wheel is_brain, plus .ctype (a string). A `boundary` cell is the map "
-    "edge — it is blocked, treat it like a wall. Unseen offsets read as empty. "
-    "RULE: an if-condition is a bool *variable name* (string), never an "
-    "expression; compute any predicate into a bool variable first. beat(OBSERVE) "
-    "must be assigned to a variable before its attributes are used."
+    "is_wheel is_brain, plus .ctype. boundary = map edge (blocked); unseen "
+    "offsets = empty."
 )
 
 # The author's system prompt lives in a co-located markdown file so it can be
@@ -90,6 +86,14 @@ def render_user(turn: TurnInput) -> str:
     if turn.instructions:
         lines.append(f"INSTRUCTIONS (authoritative): {turn.instructions}")
 
+    if turn.extra:
+        lines.append(
+            "LONG-TERM MEMORY (learned from OTHER maps — authoritative bans; apply "
+            "them here too):")
+        for ln in str(turn.extra).splitlines():
+            if ln.strip():
+                lines.append(f"  {ln}")
+
     seed = turn.seed_observation
     if seed:
         s = _fmt_obs(seed)
@@ -108,6 +112,8 @@ def render_user(turn: TurnInput) -> str:
         if fb.failure_snapshot:
             lines.append(f"  ended near {tuple(fb.failure_snapshot.pos)}, "
                          f"complexity {fb.failure_snapshot.complexity}.")
+            if fb.failure_snapshot.stuck:
+                lines.append(f"  DIAGNOSIS: {fb.failure_snapshot.stuck}")
         if fb.yielded:
             lines.append("you yielded:")
             for y in fb.yielded:

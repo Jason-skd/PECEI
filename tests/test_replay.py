@@ -7,7 +7,7 @@ os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
 from pecei.infra import Result, Trace
 from pecei.llm import MockProvider
 from pecei.replay import model as M
-from pecei.replay.assets import load_tiles
+from pecei.render.assets import load_tiles
 from pecei.render import Renderer
 from pecei.session import Session
 

@@ -121,7 +121,6 @@ class BufferItem:
     def age(self, current_epoch: int) -> int:
         return max(0, current_epoch - self.feedback_epoch)
 
-
 class MemoryEvolution:
     """Core memory & evolution module of the game-clearing agent.
 
@@ -181,6 +180,56 @@ class MemoryEvolution:
         parts: list[str] = [item.content for item in self._ranked_buffer()]
         parts.extend(self.extra_directives)
         return "\n".join(p for p in parts if p)
+
+    # ------------------------------------------------------------------ #
+    # persistence (cross-map carry-over): the learnable state, minus the llm
+    # ------------------------------------------------------------------ #
+
+    def to_dict(self) -> dict:
+        """Snapshot the learnable state (epoch + buffer + archive + config).
+
+        Plain-JSON so a shared memory can be handed between sessions / processes
+        (the warm-start arm of the comparison experiment). The optional ``llm``
+        callable is NOT serialised — it is re-attached after ``from_dict``.
+        """
+        return {
+            "alpha": self.alpha,
+            "buffer_capacity": self.buffer_capacity,
+            "defrag_threshold": self.defrag_threshold,
+            "epoch": self.epoch,
+            "buffer": [
+                {
+                    "content": it.content,
+                    "complexity": it.complexity,
+                    "feedback_epoch": it.feedback_epoch,
+                    "score": it.score,
+                }
+                for it in self.buffer
+            ],
+            "extra_directives": list(self.extra_directives),
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict, *, llm: Callable[[str], str] | None = None) -> "MemoryEvolution":
+        """Rebuild a MemoryEvolution from :meth:`to_dict` output (llm re-attached)."""
+        m = cls(
+            alpha=data.get("alpha", DEFAULT_ALPHA),
+            buffer_capacity=data.get("buffer_capacity", DEFAULT_BUFFER_CAPACITY),
+            defrag_threshold=data.get("defrag_threshold", DEFAULT_DEFRAG_THRESHOLD),
+            llm=llm,
+        )
+        m.epoch = int(data.get("epoch", 0))
+        m.buffer = [
+            BufferItem(
+                content=it["content"],
+                complexity=float(it["complexity"]),
+                feedback_epoch=int(it["feedback_epoch"]),
+                score=float(it["score"]),
+            )
+            for it in data.get("buffer", [])
+        ]
+        m.extra_directives = [str(d) for d in data.get("extra_directives", [])]
+        return m
 
     # ------------------------------------------------------------------ #
     # Stage 1: time-decay exploration buffer

@@ -62,6 +62,8 @@ def _stmt(s, env: dict[str, str]) -> None:
     if isinstance(s, Assign):
         if isinstance(s.expr, Beat) and s.expr.op is BeatOp.OBSERVE:
             env[s.name] = "obs"
+        elif isinstance(s.expr, Beat) and s.expr.op is BeatOp.VISITED:
+            env[s.name] = "bool"
         else:
             env[s.name] = _expr(s.expr, env)
     elif isinstance(s, If):
@@ -102,6 +104,8 @@ def _expr(e, env: dict[str, str]) -> str:
     if isinstance(e, Beat):
         if e.op is BeatOp.OBSERVE:
             raise CompileError("beat(OBSERVE) must be assigned to a variable, not used inline")
+        if e.op is BeatOp.VISITED:
+            raise CompileError("beat(VISITED) must be assigned to a variable, not used inline")
         if e.value is None or _expr(e.value, env) != "obs":
             raise CompileError("beat(YIELD, ...) expects an observation variable")
         return "void"

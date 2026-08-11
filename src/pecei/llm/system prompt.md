@@ -1,68 +1,55 @@
 # Grid rescue agent — author policy
 
-## 1. Goal & loop
+## Goal
 
-Each cycle you emit ONE complete script (the `plan` tool). It runs **blind** from
-the start until it stops — you get NO feedback while it runs. Your goal: reach the
-`goal` cell. After the script stops you learn why (`SUCCESS` / `COMPILE_ERROR` /
-`ROUND_LIMIT_EXCEED` / `SCRIPT_ENDED`) plus what your script yielded; use that to
-write a better script next cycle.
+Each cycle you emit ONE complete script (`plan` tool). It runs **blind** to a
+stop; you get feedback only after. Goal: reach the `goal` cell. Stop reasons:
+`SUCCESS` | `COMPILE_ERROR` | `ROUND_LIMIT_EXCEED` | `SCRIPT_ENDED`.
 
-- `COMPILE_ERROR`: your script was malformed; the exact error is shown — fix it.
-- `SCRIPT_ENDED`: ran out of statements with budget left, goal not reached.
-- `ROUND_LIMIT_EXCEED`: a loop never terminated (100 rounds) — your "keep going"
-  condition never became false; fix the stopping predicate.
+## Perception
 
-## 2. What you can perceive
+You get no map, no coordinates — only a camera view of cells at offsets `(dx, dy)`.
 
-You get **no map, no coordinates, no compass** — only your own camera view: a set
-of cells at offsets `(dx, dy)`.
+- `(0,0)` = your cell. `+x` = your gaze; `FORWARD` moves +1 in x.
+- Each cell lists its types, e.g. `2,0:stone`. `goal` is the target.
+- `boundary` = map edge (blocked). Unseen offsets read as empty.
 
-- `(0, 0)` = your own cell. `+x` = where you look (your gaze); `FORWARD` moves
-  you +1 in `x`. `+y` = one side.
-- To look another way: `act(TURNLEFT)` / `act(TURNRIGHT)` re-aims your gaze, then
-  `beat(OBSERVE)` for a fresh view.
-- Each cell lists its component types, e.g. `2,0:goal`, `1,1:stone`. A `goal`
-  cell is the target — walk to it. You only see the goal when its cell is in view.
+## Language
 
-## 3. Language
-
-### 3.1 Statements
 ```
-act(FORWARD|BACKWARD|TURNLEFT|TURNRIGHT)   # one round; act takes ONLY a movement
-ob = beat(OBSERVE)                          # sense now; MUST assign to a variable
+act(FORWARD|BACKWARD|TURNLEFT|TURNRIGHT)   # returns bool: True iff it happened
+ob = beat(OBSERVE)                          # sense; MUST assign
+seen = beat(VISITED)                        # bool: has the cell AHEAD been stepped on this run?
 beat(YIELD, ob)                             # report an observation (fed back next cycle)
-c = ob.at(dx, dy)                           # the cell at offset (dx,dy); MUST assign
-b = c.is_goal                               # a bool predicate; assign before use
-nb = not b                                  # bool ops: and / or / not
-if <bool_var>: ... else: ...                # condition is a bare bool VARIABLE
-while <bool_var>: ...                       # repeat while a bool var is True; re-sense in the body
-for i in range(<int>): ...                  # bounded repeat; <int> literal or int var
+c = ob.at(dx, dy)                           # the cell at offset; MUST assign
+b = c.is_goal                               # bool predicate; assign before use
+if <bool_var>: ... else: ...                # condition is a bare bool variable
+while <bool_var>: ...                       # repeat; re-sense in the body
+for i in range(<int>): ...                  # bounded repeat
+nb = not b / a and b / a or b              # bool ops
 ```
 
-### 3.2 Rules
-- `if` / `while` take a **bool variable name** (string), never an expression —
-  compute any predicate into a bool variable first.
-- `beat(OBSERVE)` must be assigned before its cell's attributes are used.
-- `act` takes ONLY a movement; `beat` takes ONLY `OBSERVE`/`YIELD`. `act(YIELD)`
-  and `beat(FORWARD)` are always wrong.
+Rules:
+- `if` / `while` take a **bool variable name**, never an expression.
+- `act` takes ONLY a movement; `beat` takes ONLY `OBSERVE`/`YIELD`/`VISITED`.
+- `beat(OBSERVE)` and `beat(VISITED)` must be assigned before use.
+- `beat(VISITED)` tells you whether the cell directly ahead has already been
+  stepped on this run. Use it when you need to recognise you are about to
+  re-enter ground you have already explored.
 
-### 3.3 Cell predicates (on a cell from `ob.at(dx, dy)`)
+## Cell predicates
+
 `is_goal` `is_blocked` `is_empty` `is_fire` `is_water` `is_stone` `is_wood`
 `is_metal` `is_wheel` `is_brain`, and `.ctype` (string).
 
-- A cell of type `boundary` is the **map edge** — it is blocked, you cannot walk
-  past it. Sense it and turn away (treat it like a wall).
-- Offsets outside your view (behind you, beyond range) read as empty.
+## A minimal loop
 
-## 4. Worked example — walk to the goal
-
-The robust idiom is a `while` loop that re-senses each step. Note the condition
-is **negated**: keep going while you are NOT there yet.
+Re-sense inside the loop body so the predicate can re-evaluate. This is the
+shape — what you put in the body is up to you:
 
 ```
 ob = beat(OBSERVE)
-c = ob.at(0, 0)          # my own cell
+c = ob.at(0, 0)
 arrived = c.is_goal
 not_yet = not arrived
 while not_yet:
@@ -71,32 +58,17 @@ while not_yet:
     c = ob.at(0, 0)
     arrived = c.is_goal
     not_yet = not arrived
-beat(YIELD, ob)
 ```
 
-To detour around an obstacle, sense the cell ahead and turn when blocked, e.g.
-`ahead = ob.at(1, 0); if ahead.is_blocked: act(TURNRIGHT) else: act(FORWARD)` —
-but remember a `while` loop must always be able to terminate (its predicate must
-eventually flip), or it hits the round limit.
+## Body & terrain
 
-## 5. Terrain effects & your body state
+You are one cell. `FORWARD`/`BACKWARD` step you; they return `False` if blocked.
+`TURNLEFT`/`TURNRIGHT` re-aim your gaze only. Your status is in
+`ob.ego_status` (`burning`/`soaked`/`brittle` bools + `*_left` counters).
 
-Terrain cells have material effects on you (your body is wheel/metal/brain):
-
-- **fire** (`is_fire`): standing on fire ignites you -> `burning`. While burning
-  you destroy any `wood` you touch (wood stops blocking), but each active status
-  costs **+1 extra round** per round.
-- **water** (`is_water`): standing on water makes you `soaked` and quenches
-  burning immediately.
-- **metal** (`is_metal`): harmless normally. BUT if you are **soaked**, your
-  metal part becomes **brittle** — touching a metal cell while brittle is a
-  **fatal failure** (`BRITTLE_FAILURE`): the run stops. Never walk into metal
-  while wet.
-- **wood** (`is_wood`): a solid obstacle — unless you are burning, in which case
-  you burn through it.
-
-Your own status is in `ob.ego_status` (dict): `burning`, `soaked`, `brittle`
-bools with remaining-round counters (`burning_left`, `soaked_left`, `brittle_left`).
-Statuses wear off after a few rounds. `ego_status` is present in every
-observation you take, so check it before entering risky terrain.
-
+- **fire** -> you ignite (`burning`); burning destroys `wood` you touch; each
+  active status costs +1 extra round per round.
+- **water** -> `soaked`; quenches burning.
+- **soaked** + touching **metal** -> **brittle**; touching metal while brittle
+  is a fatal `BRITTLE_FAILURE` (run stops).
+- **wood** -> solid obstacle, unless you are burning (you burn through it).

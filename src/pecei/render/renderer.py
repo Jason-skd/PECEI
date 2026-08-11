@@ -22,19 +22,19 @@ from . import tiles
 class Renderer:
     """Render ground-truth world state to a pygame.Surface.
 
-    ``use_images=True`` + an assets dir swaps the flat color blocks for PNG tiles
-    (loaded once, scaled to the cell size); a missing tile falls back to the
-    color+shape block, so images are strictly optional.
+    By default the renderer uses PNG tiles from ``render/assets/`` (loaded once,
+    scaled to the cell size); a missing tile falls back to a color+shape block.
+    Pass ``use_images=False`` to force the flat color+shape blocks everywhere.
     """
 
-    def __init__(self, tile: int = tiles.TILE, use_images: bool = False,
+    def __init__(self, tile: int = tiles.TILE, use_images: bool = True,
                  assets_dir: str | None = None) -> None:
         pygame.init()
         self.tile = tile
         self.use_images = use_images
         self._tiles: dict = {}
         if use_images:
-            from pecei.replay.assets import load_tiles
+            from .assets import load_tiles
             self._tiles = load_tiles(tile, assets_dir)
 
     def render(

@@ -146,6 +146,18 @@ def test_observe_must_be_assigned():
         type_check(bad)
 
 
+def test_visited_must_be_assigned_and_is_bool():
+    # beat(VISITED) is a bool, legal only as the direct RHS of an Assign.
+    with pytest.raises(CompileError):
+        type_check(Program(body=[ExprStmt(expr=Beat(op=BeatOp.VISITED))]))
+    # assigned -> bool-typed, usable as an if/while condition
+    prog = Program(body=[
+        Assign(name="seen", expr=Beat(op=BeatOp.VISITED)),
+        If(test="seen", then=[], orelse=[]),
+    ])
+    type_check(prog)  # should not raise
+
+
 def test_bool_op_and_compare_typecheck():
     prog = Program(body=[
         Assign(name="ob", expr=Beat(op=BeatOp.OBSERVE)),

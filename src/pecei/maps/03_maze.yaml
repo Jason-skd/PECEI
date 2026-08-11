@@ -1,0 +1,53 @@
+# 03 maze — staggered walls, gap selection. 14x9. Single-cell ego (brain) faces
+# EAST at (1,7). Goal at (12,1). Three stone walls force a zig-zag: wall A at
+# x=4 (gap at bottom), wall B at x=8 (gap at top), wall C at x=11 (gap at
+# bottom). The ego must thread A's bottom gap, climb between A and B, cross B's
+# top gap, descend, then take C's bottom gap to reach the goal. Greedy
+# wall-following loops between the staggered walls; VISITED+backtrack unravels
+# it. Teaches: layered obstacle navigation + gap choice.
+width: 14
+height: 9
+goal: [12, 1]
+entities:
+  - name: ego
+    anchor: [1, 7]
+    orientation: EAST
+    is_ego: true
+    components:
+      - { offset: [0, 0], type: brain }
+  # wall A at x=4 (rows 0-6, gap at bottom row 7)
+  - name: wallA
+    anchor: [4, 0]
+    components:
+      - { offset: [0, 0], type: stone }   # (4,0)
+      - { offset: [0, 1], type: stone }   # (4,1)
+      - { offset: [0, 2], type: stone }   # (4,2)
+      - { offset: [0, 3], type: stone }   # (4,3)
+      - { offset: [0, 4], type: stone }   # (4,4)
+      - { offset: [0, 5], type: stone }   # (4,5)
+      - { offset: [0, 6], type: stone }   # (4,6)
+      # gap at (4,7)
+  # wall B at x=8 (rows 2-8, gap at top row 1)
+  - name: wallB
+    anchor: [8, 2]
+    components:
+      - { offset: [0, 0], type: stone }   # (8,2)
+      - { offset: [0, 1], type: stone }   # (8,3)
+      - { offset: [0, 2], type: stone }   # (8,4)
+      - { offset: [0, 3], type: stone }   # (8,5)
+      - { offset: [0, 4], type: stone }   # (8,6)
+      - { offset: [0, 5], type: stone }   # (8,7)
+      - { offset: [0, 6], type: stone }   # (8,8)
+      # gap at (8,1)
+  # wall C at x=11 (rows 2-8, gap at top row 1)
+  - name: wallC
+    anchor: [11, 2]
+    components:
+      - { offset: [0, 0], type: stone }   # (11,2)
+      - { offset: [0, 1], type: stone }   # (11,3)
+      - { offset: [0, 2], type: stone }   # (11,4)
+      - { offset: [0, 3], type: stone }   # (11,5)
+      - { offset: [0, 4], type: stone }   # (11,6)
+      - { offset: [0, 5], type: stone }   # (11,7)
+      - { offset: [0, 6], type: stone }   # (11,8)
+      # gap at (11,1)
