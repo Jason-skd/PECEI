@@ -1,18 +1,26 @@
-# 02 one wall — detour. 10x6. ego(1,3)EAST -> goal(8,2). Stone wall column blocks the
-# east row; go around the top. Fires the branch/turning path.
-width: 10
-height: 6
-goal: [8, 2]
+# 02 one wall — single detour. 12x7. 3-cell vertical ego faces EAST at anchor
+# (4,5), body trailing west along row 5. Goal at (10,1). A stone wall column at
+# x=7 (rows 1-5) blocks the direct east path; the gap is at the TOP (row 0).
+# Route: go east until the wall, turn up the left side of the wall, through the
+# top gap, then east+down to goal. Teaches: detect obstacle, turn to detour.
+width: 12
+height: 7
+goal: [10, 1]
 entities:
   - name: ego
-    anchor: [3, 3]
+    anchor: [4, 5]
     orientation: EAST
     is_ego: true
     components:
-      - { offset: [0, 0], type: brain }
+      - { offset: [0, 0], type: wheel }
+      - { offset: [0, 1], type: metal }
+      - { offset: [0, 2], type: brain }
   - name: wall
-    anchor: [5, 2]
+    anchor: [7, 1]
     components:
-      - { offset: [0, 0], type: stone }
-      - { offset: [0, 1], type: stone }
-      - { offset: [0, 2], type: stone }
+      - { offset: [0, 0], type: stone }   # (7,1)
+      - { offset: [0, 1], type: stone }   # (7,2)
+      - { offset: [0, 2], type: stone }   # (7,3)
+      - { offset: [0, 3], type: stone }   # (7,4)
+      - { offset: [0, 4], type: stone }   # (7,5)
+      # gap at (7,0)

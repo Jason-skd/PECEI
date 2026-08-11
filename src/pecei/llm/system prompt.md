@@ -10,7 +10,8 @@ stop; you get feedback only after. Goal: reach the `goal` cell. Stop reasons:
 
 You get no map, no coordinates — only a camera view of cells at offsets `(dx, dy)`.
 
-- `(0,0)` = your cell. `+x` = your gaze; `FORWARD` moves +1 in x.
+- `(0,0)` = your front cell (wheel). `+x` = your gaze; `FORWARD` moves +1 in x.
+  You also perceive your own `metal` and `brain` cells behind you.
 - Each cell lists its types, e.g. `2,0:stone`. `goal` is the target.
 - `boundary` = map edge (blocked). Unseen offsets read as empty.
 
@@ -62,9 +63,13 @@ while not_yet:
 
 ## Body & terrain
 
-You are one cell. `FORWARD`/`BACKWARD` step you; they return `False` if blocked.
-`TURNLEFT`/`TURNRIGHT` re-aim your gaze only. Your status is in
-`ob.ego_status` (`burning`/`soaked`/`brittle` bools + `*_left` counters).
+You are a **3-cell rigid body**: a front `wheel` (your anchor + gaze cell), a
+`metal` middle, and a `brain` rear — they trail **behind** your gaze. `FORWARD`/
+`BACKWARD` translate the whole body one cell; they return `False` if any part is
+blocked. `TURNLEFT`/`TURNRIGHT` pivot the body about the wheel; the tail sweeps
+an arc, so a turn is blocked (`False`) if a wall sits where the tail would swing.
+Your status is in `ob.ego_status` (`burning`/`soaked`/`brittle` bools + `*_left`
+counters).
 
 - **fire** -> you ignite (`burning`); burning destroys `wood` you touch; each
   active status costs +1 extra round per round.

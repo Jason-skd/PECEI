@@ -1,0 +1,37 @@
+# 03 maze — two staggered stone walls, blind exploration. 12x8. 3-cell vertical
+# ego faces EAST at anchor (4,6), body trailing west along row 6. Goal at (10,1).
+# Wall A at x=6 (rows 2-6, gap at top row 0/1); wall B at x=8 (rows 1-5, gap at
+# bottom row 6). Route: up the left of A, through A's top gap, across, down the
+# left of B is blocked so cross to the right of B, down through B's bottom gap,
+# back up to goal. Two detours + tight turns test full planning. Teaches: layered
+# obstacle navigation + backtracking.
+width: 12
+height: 8
+goal: [10, 1]
+entities:
+  - name: ego
+    anchor: [4, 6]
+    orientation: EAST
+    is_ego: true
+    components:
+      - { offset: [0, 0], type: wheel }
+      - { offset: [0, 1], type: metal }
+      - { offset: [0, 2], type: brain }
+  - name: wallA
+    anchor: [6, 2]
+    components:
+      - { offset: [0, 0], type: stone }   # (6,2)
+      - { offset: [0, 1], type: stone }   # (6,3)
+      - { offset: [0, 2], type: stone }   # (6,4)
+      - { offset: [0, 3], type: stone }   # (6,5)
+      - { offset: [0, 4], type: stone }   # (6,6)
+      # gap at (6,0)/(6,1)
+  - name: wallB
+    anchor: [8, 1]
+    components:
+      - { offset: [0, 0], type: stone }   # (8,1)
+      - { offset: [0, 1], type: stone }   # (8,2)
+      - { offset: [0, 2], type: stone }   # (8,3)
+      - { offset: [0, 3], type: stone }   # (8,4)
+      - { offset: [0, 4], type: stone }   # (8,5)
+      # gap at (8,6)/(8,7)
