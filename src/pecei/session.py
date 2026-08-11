@@ -111,9 +111,16 @@ class Session(BaseModel):
         provider: LLMProvider,
         *,
         trace_dir: str | Path | None = None,
+        memory: Any | None = None,
     ) -> CycleRecord:
         """Run ONE script cycle and append its record. The previous cycle's outcome
-        becomes this cycle's Feedback; all prior cycles form the snowball."""
+        becomes this cycle's Feedback; all prior cycles form the snowball.
+
+        ``memory`` is an optional shared ``MemoryEvolution`` carried across maps:
+        its rendered context is shown to the author before it decides, and the
+        resulting feedback is remembered afterwards (so the learned bans follow
+        the agent onto the next map).
+        """
         run = run_script(
             self.map, provider,
             feedback=self.last_feedback(),
@@ -123,7 +130,11 @@ class Session(BaseModel):
             snowball=self.cycle_summaries()[:-1],
             instructions=self.instructions,
             round_budget=self.round_budget,
+            memory_context=(memory.get_current_context() or None) if memory is not None else None,
         )
+
+        if memory is not None:
+            memory.remember(run.to_feedback())
 
         trace_path: str | None = None
         if trace_dir is not None:
@@ -156,8 +167,13 @@ def auto_session(
     budget: int = 10,
     trace_dir: str | Path | None = None,
     dump_transcript: bool = True,
+    memory: Any | None = None,
 ) -> Session:
-    """Run cycles automatically until SUCCESS or ``budget`` cycles are exhausted."""
+    """Run cycles automatically until SUCCESS or ``budget`` cycles are exhausted.
+
+    ``memory`` (optional shared ``MemoryEvolution``) is threaded through every
+    cycle so learned bans carry across the maps an experiment runs back-to-back.
+    """
     while True:
         if session.cycles and session.cycles[-1].stop_reason is Result.SUCCESS:
             print(f"[auto] SUCCESS in cycle {session.cycles[-1].index}")
@@ -165,7 +181,7 @@ def auto_session(
         if len(session.cycles) >= budget:
             print(f"[auto] budget {budget} cycles exhausted ({session.success_count} success)")
             break
-        rec = session.run_one_cycle(provider, trace_dir=trace_dir)
+        rec = session.run_one_cycle(provider, trace_dir=trace_dir, memory=memory)
         session.save(path)
         _print_cycle(rec)
     session.save(path)
