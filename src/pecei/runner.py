@@ -7,6 +7,11 @@ observations as :class:`Feedback` for the next cycle. There is **no per-round
 ``decide`` loop** — the author is blind while the script runs and only learns
 after it stops.
 
+A malformed script (``COMPILE_ERROR``) costs the cycle nothing to *execute*, so the
+runner gives the author a few immediate, failure-aware retries (the compile error
+is fed straight back) before recording the cycle as failed — this keeps cycles from
+being wasted on pure AST-shape slips.
+
 Stop reasons: ``SUCCESS`` (goal reached) | ``COMPILE_ERROR`` (script didn't
 compile — bad AST or type error; message fed back) | ``ROUND_LIMIT_EXCEED``
 (budget) | ``ENERGY_RUN_OUT`` (reserved) | ``SCRIPT_ENDED`` (body fully executed,
@@ -17,13 +22,24 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from pecei.action import BudgetExceeded, CompileError, Host, Interpreter, pretty
+from pecei.action import (
+    BudgetExceeded,
+    CompileError,
+    Host,
+    Interpreter,
+    pretty,
+)
 from pecei.engine import BrittleFailure, RoundEngine
 from pecei.infra import FailureSnapshot, Result, Trace, TraceEvent, build_report
 from pecei.llm import Directive, Feedback, LLMProvider, TurnInput
 from pecei.llm.prompt import load_system_prompt, render_user
 from pecei.observation import observe
 from pecei.world import ActionType, World, apply_action, load_world
+
+# How many extra attempts the author gets within one cycle when its script fails
+# to compile. Each retry re-asks with the compile error fed back. Kept small so a
+# cycle is still "one coherent attempt", not an unbounded repair loop.
+COMPILE_RETRY_LIMIT = 3
 
 
 @dataclass
@@ -66,6 +82,14 @@ def seed_observation(world: World) -> dict:
     return observe(world, ego.eid).to_dict()
 
 
+def _ahead(world: World) -> tuple[int, int]:
+    """The cell one step along the ego's gaze (where FORWARD would land)."""
+    ego = world.ego
+    ax, ay = ego.anchor
+    dx, dy = ego.orientation.delta
+    return (ax + dx, ay + dy)
+
+
 def run_script(
     map_path: str,
     provider: LLMProvider,
@@ -75,9 +99,60 @@ def run_script(
     instructions: str | None = None,
     round_budget: int = 100,
     ego_eid: str | None = None,
+    compile_retries: int = COMPILE_RETRY_LIMIT,
+    memory_context: str | None = None,
 ) -> ScriptRun:
-    """Run one cycle: fresh map -> ONE decide() -> run script to stop -> Feedback."""
-    world = load_world(map_path)                   # reset-per-script (fresh map each cycle)
+    """Run one cycle: fresh map -> ONE decide() -> run script to stop -> Feedback.
+
+    If the author's script fails to compile, retry up to ``compile_retries`` more
+    times *within this same cycle*, feeding the compile error back each time, so a
+    cycle is not wasted on a pure AST-shape slip. The cycle still ends in
+    ``COMPILE_ERROR`` if every attempt fails.
+
+    ``memory_context`` is the cross-map long-term memory (a shared
+    ``MemoryEvolution``'s rendered context) handed in by the caller; it is shown
+    to the author as authoritative learned bans.
+    """
+    attempt_feedback = feedback
+    last: ScriptRun | None = None
+    for attempt in range(1, compile_retries + 2):   # initial attempt + N retries
+        run = _run_once(
+            map_path, provider,
+            feedback=attempt_feedback,
+            snowball=snowball,
+            instructions=instructions,
+            round_budget=round_budget,
+            ego_eid=ego_eid,
+            memory_context=memory_context,
+        )
+        last = run
+        if run.stop_reason is not Result.COMPILE_ERROR:
+            return run
+        if attempt <= compile_retries:
+            # Feed the compile error straight back and let the author fix it.
+            attempt_feedback = Feedback(
+                stop_reason=Result.COMPILE_ERROR,
+                rounds_used=0,
+                script=run.program,
+                compile_error=run.compile_error,
+            )
+    assert last is not None
+    return last
+
+
+def _run_once(
+    map_path: str,
+    provider: LLMProvider,
+    *,
+    feedback: Feedback | None,
+    snowball: list[dict] | None,
+    instructions: str | None,
+    round_budget: int,
+    ego_eid: str | None,
+    memory_context: str | None,
+) -> ScriptRun:
+    """One map-fresh decide()+execute pass (a single attempt within a cycle)."""
+    world = load_world(map_path)                   # reset-per-script (fresh map each attempt)
     ego = world.ego
     if ego is None:
         raise ValueError("world has no ego entity (is_ego=True)")
@@ -87,9 +162,16 @@ def run_script(
     eng = RoundEngine(world, round_budget=round_budget)
     trace = Trace()
     yielded: list[dict] = []
+    # Ego-centric footprint memory for beat(VISITED): every cell the ego's anchor
+    # has stepped onto *after moving* this run. The start cell is NOT pre-seeded,
+    # so beat(VISITED) reads False on the first cell (you haven't "been here"
+    # before) and True only once you return to a cell you already stepped on —
+    # the signal that breaks dead-end / circling loops.
+    visited: set[tuple[int, int]] = set()
 
     def on_round(r: int, eid: str, action: ActionType, res) -> None:
         ent = world.entity(eid)
+        visited.add(ent.anchor)
         trace.append(TraceEvent(
             round=r, actor=eid, action=action.value, moved=res.moved, blocked=res.blocked,
             anchor_after=ent.anchor, orientation_after=ent.orientation.value,
@@ -101,6 +183,12 @@ def run_script(
         act=lambda a: eng.apply(ego_eid, a).moved,
         observe=lambda: observe(world, ego_eid),
         yield_=lambda v: yielded.append(v.to_dict()),
+        # beat(VISITED): has the cell DIRECTLY AHEAD (one step along the gaze)
+        # been stepped on this run? This is the "am I about to re-tread?" signal
+        # a blind agent uses to avoid walking back onto explored ground. Checking
+        # the cell ahead (not the current cell) means it stays meaningful while
+        # turning in place: turn until the cell ahead is clear AND unvisited.
+        visited=lambda: _ahead(world) in visited,
     )
     interp = Interpreter(host)
 
@@ -110,12 +198,13 @@ def run_script(
         seed_observation=seed_observation(world),
         feedback=feedback,
         snowball=snowball or [],
+        extra=memory_context,
     )
     # Record exactly what the author was shown this cycle. The system prompt may
     # drift across versions, so capturing it per-cycle lets replay reproduce the
     # author's true context regardless of later edits to prompt.py.
     prompt = {"system": load_system_prompt(), "user": render_user(turn)}
-    out = provider.decide(turn)                    # ONE LLM request per cycle
+    out = provider.decide(turn)                    # ONE LLM request per attempt
     program = out.program
     compile_error: str | None = out.error          # A-layer: malformed AST (parse failed)
 
@@ -147,7 +236,8 @@ def run_script(
         result = Result.SCRIPT_ENDED               # body fully executed, goal not reached
 
     report = build_report(
-        world, result, goal=goal, yielded=yielded, round=eng.round, round_budget=round_budget
+        world, result, goal=goal, yielded=yielded, round=eng.round, round_budget=round_budget,
+        trace=trace,
     )
 
     program_str = pretty(program) if program is not None else ""

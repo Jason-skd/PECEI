@@ -79,5 +79,7 @@ def _expr(e) -> str:
     if isinstance(e, Beat):
         if e.op is BeatOp.OBSERVE:
             return "beat(OBSERVE)"
+        if e.op is BeatOp.VISITED:
+            return "beat(VISITED)"
         return f"beat(YIELD, {_expr(e.value)})"
     return "?"

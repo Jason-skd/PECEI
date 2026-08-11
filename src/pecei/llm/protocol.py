@@ -96,7 +96,7 @@ _EXPR_KIND_BY_KEY = {
     "action": "act", "left": "compare", "operands": "boolop", "obj": None,
 }
 _BOOL_OPS = {"and", "or", "not"}
-_BEAT_OPS = {"OBSERVE", "YIELD"}
+_BEAT_OPS = {"OBSERVE", "YIELD", "VISITED"}
 
 
 def _normalize(node: Any, *, in_body: bool = False) -> Any:

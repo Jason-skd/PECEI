@@ -102,10 +102,11 @@ class Act(BaseModel):
 
 
 class BeatOp(str, Enum):
-    """The two senses of the single ``beat`` verb (OBSERVE / YIELD)."""
+    """The senses of the single ``beat`` verb."""
 
     OBSERVE = "OBSERVE"
     YIELD = "YIELD"
+    VISITED = "VISITED"  # ego-centric footprint memory: has this cell been stepped on this run?
 
 
 class Beat(BaseModel):
