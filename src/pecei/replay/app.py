@@ -26,9 +26,9 @@ PLAY_MS = 600  # auto-advance interval when playing
 
 
 class _App:
-    def __init__(self, model: M.ReplayModel, *, use_images: bool = True) -> None:
+    def __init__(self, model: M.ReplayModel) -> None:
         self.model = model
-        self.renderer = Renderer(use_images=use_images)
+        self.renderer = Renderer()
         self.frames = model.frames
         self.starts = model.epoch_starts()
         self.i = self.starts[0] if self.starts else 0  # current flat-frame index

@@ -4,10 +4,10 @@
 - ``replay_session(map, session)``: browse a session's epochs, replay one, or
   play from the selected epoch through to the end.
 
-Image tiles (``render/assets/*.png``) are used when present; the renderer falls
-back to color+shape blocks when they're missing. UI text is Pillow-rendered
-(pygame fonts are broken on py3.14). Entry points are lazily imported so the
-render layer can reuse ``replay.assets`` without a circular import.
+Rendering reuses the shared ``render`` layer (PNG tiles from ``render/assets/``;
+the renderer falls back to color+shape blocks when a tile is missing). UI text is
+Pillow-rendered (pygame fonts are broken on py3.14). Entry points are lazily
+imported so ``import pecei.replay`` stays cheap.
 """
 from __future__ import annotations
 

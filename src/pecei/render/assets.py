@@ -1,6 +1,6 @@
 """Tile asset loading for the image-based renderer.
 
-Loads ``replay/assets/<type>.png`` per component type (plus goal/empty), caches
+Loads ``render/assets/<type>.png`` per component type (plus goal/empty), caches
 them, and scales to the cell size. PNG decoding goes through **Pillow** (pygame's
 ``image.load`` can't read PNG on Python 3.14 — no SDL_image). Any missing tile is
 simply absent from the dict so the renderer can fall back to its color+shape block.
