@@ -10,9 +10,7 @@ entities:
     orientation: EAST
     is_ego: true
     components:
-      - { offset: [0, 0], type: wheel }
-      - { offset: [0, 1], type: metal }
-      - { offset: [0, 2], type: brain }
+      - { offset: [0, 0], type: brain }
   - name: wallA
     anchor: [6, 2]
     components:

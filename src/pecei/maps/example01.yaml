@@ -9,9 +9,7 @@ entities:
     orientation: NORTH
     is_ego: true
     components:
-      - { offset: [0, 0], type: wheel }
-      - { offset: [0, 1], type: metal }
-      - { offset: [0, 2], type: brain }
+      - { offset: [0, 0], type: brain }
   # a 2-cell river
   - name: river
     anchor: [3, 1]
