@@ -56,6 +56,24 @@ def main(argv: list[str] | None = None) -> int:
     p_exp.add_argument("--base-url", default=None, help="provider base URL / relay endpoint")
     p_exp.add_argument("--no-transcript", action="store_true", help="don't auto-write <slug>.transcript.txt per session")
 
+    p_cmp = sub.add_parser(
+        "compare", help="warm-vs-cold comparison: train on train_dir, then test both arms on test_dir")
+    p_cmp.add_argument("train_dir", help="directory of NN_slug maps to train on (warm-start phase)")
+    p_cmp.add_argument("test_dir", help="directory of NN_slug maps to evaluate BOTH arms on")
+    p_cmp.add_argument("--budget", type=int, default=10, help="max script cycles per session")
+    p_cmp.add_argument("--round-budget", type=int, default=100, help="max rounds per script")
+    p_cmp.add_argument("--out", default="compare", help="output dir for comparison results")
+    p_cmp.add_argument("--provider", default="mock", help="mock | anthropic | openai | deepseek")
+    p_cmp.add_argument("--api-key", default=None, help="provider API key (else env)")
+    p_cmp.add_argument("--base-url", default=None, help="provider base URL / relay endpoint")
+    p_cmp.add_argument("--model", default=None, help="author model override (e.g. claude-haiku-4-5)")
+    p_cmp.add_argument("--memory-model", default=None,
+                       help="model for memory compression (defaults to --model / provider default)")
+    p_cmp.add_argument("--no-llm-memory", action="store_true",
+                       help="use deterministic (rule-based) memory compression instead of an LLM")
+    p_cmp.add_argument("--plot", action="store_true", help="also render a grouped bar chart PNG")
+    p_cmp.add_argument("--no-transcript", action="store_true", help="don't auto-write transcripts per session")
+
     p_rep = sub.add_parser("replay", help="replay a trace (one epoch) or a session (pick an epoch)")
     p_rep.add_argument("map", help="path to the map that produced the trace(s)")
     p_rep.add_argument("trace", nargs="?", default=None, help="path to a trace JSONL (single epoch)")
@@ -77,6 +95,8 @@ def main(argv: list[str] | None = None) -> int:
         return _auto(args)
     if args.cmd == "experiment":
         return _experiment(args)
+    if args.cmd == "compare":
+        return _compare(args)
     if args.cmd == "replay":
         return _replay(args)
     if args.cmd == "transcript":
@@ -152,6 +172,91 @@ def _experiment(args) -> int:
         dump_transcript=not args.no_transcript,
     )
     return 0
+
+
+def _compare(args) -> int:
+    from pecei.compare import run_compare
+
+    provider = make_provider(args.provider, **_provider_kwargs(args, args.provider))
+    if args.model and hasattr(provider, "model"):
+        provider.model = args.model
+
+    memory_llm = None
+    if not args.no_llm_memory and args.provider != "mock":
+        memory_llm = _memory_llm_callable(args)
+
+    result = run_compare(
+        args.train_dir, args.test_dir, provider,
+        budget=args.budget, round_budget=args.round_budget,
+        out_dir=args.out, memory_llm=memory_llm,
+        dump_transcript=not args.no_transcript,
+    )
+    _print_comparison_summary(result)
+
+    if args.plot:
+        from pecei.plotting import plot_comparison
+
+        out = Path(args.out)
+        plot_comparison(result, out / "comparison_epochs.png", metric="epochs")
+        plot_comparison(result, out / "comparison_rounds.png", metric="rounds")
+        print(f"charts -> {out / 'comparison_epochs.png'} (+ _rounds.png)")
+    return 0
+
+
+def _memory_llm_callable(args):
+    """Build a ``(str)->str`` callable for MemoryEvolution's compression stage.
+
+    Uses the SAME provider credentials as the author, so the warm arm's learned
+    bans are distilled by a real LLM rather than the weak deterministic
+    fallback (which Figure 1 needs to show a warm < cold gap). The callable is a
+    plain prompt->string call — distinct from the author's structured-output
+    tool-use. Returns None (caller falls back to deterministic) if the provider
+    has no plain-completion path.
+    """
+    kwargs = _provider_kwargs(args, args.provider)
+    name = args.provider
+
+    if name in ("anthropic", "claude"):
+        import anthropic
+
+        client = anthropic.Anthropic(**kwargs)
+        model = args.memory_model or args.model or "claude-haiku-4-5"
+
+        def _call(prompt: str) -> str:
+            resp = client.messages.create(
+                model=model, max_tokens=512,
+                messages=[{"role": "user", "content": prompt}],
+            )
+            for block in resp.content:
+                if getattr(block, "type", None) == "text":
+                    return block.text
+            return ""
+        return _call
+
+    if name == "openai":
+        import openai
+
+        client = openai.OpenAI(**kwargs)
+        model = args.memory_model or args.model or "gpt-4o-mini"
+
+        def _call(prompt: str) -> str:
+            resp = client.chat.completions.create(
+                model=model, max_tokens=512, messages=[{"role": "user", "content": prompt}],
+            )
+            return resp.choices[0].message.content or ""
+        return _call
+
+    # mock / deepseek / unknown: no plain-completion adapter wired -> deterministic fallback
+    return None
+
+
+def _print_comparison_summary(result) -> None:
+    print("\n=== Warm vs Cold Comparison ===")
+    print(f"{'map':22s} {'warm (epochs/rounds)':24s} {'cold (epochs/rounds)':24s}")
+    for w, c in zip(result.warm, result.cold):
+        ws = f"{w.epochs_to_success}/{w.total_rounds}" + ("" if w.solved else " (unsolved)")
+        cs = f"{c.epochs_to_success}/{c.total_rounds}" + ("" if c.solved else " (unsolved)")
+        print(f"{w.slug:22s} {ws:24s} {cs:24s}")
 
 
 def _replay(args) -> int:
