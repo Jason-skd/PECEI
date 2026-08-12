@@ -63,11 +63,12 @@ def run_experiment(
     ``memory``: an optional shared ``MemoryEvolution`` threaded through every
     session's cycles, so learned bans accumulate across the maps trained here.
 
-    ``resume``: when True, a session JSON that already reached ``budget`` cycles
-    (or SUCCESS) is loaded instead of re-run, and its per-cycle feedback is
-    replayed into ``memory`` so the warm arm's accumulated bans are reconstructed
-    exactly as if the session had just trained. Lets a long compare run restart
-    after a crash / sleep without redoing finished maps.
+    ``resume``: when True, a session JSON on disk is loaded and continued from
+    its last cycle (or skipped entirely if it already reached ``budget`` / SUCCESS).
+    Its per-cycle feedback is replayed into ``memory`` up to the resume point so
+    the warm arm's accumulated bans are reconstructed exactly as if the session
+    had just trained. Lets a long compare run restart after a crash / sleep
+    without redoing finished (or partly-finished) maps.
     """
     maps = parse_experiment(directory)
     total = len(maps)
@@ -83,20 +84,28 @@ def run_experiment(
         trace_dir = out / f"{ref.slug}.traces"
 
         existing = Session.load(sess_path) if resume and sess_path.exists() else None
-        if existing is not None and _session_complete(existing, budget):
-            print(f"[experiment] resume: {ref.slug} already complete "
-                  f"({len(existing.cycles)} cycle(s)) — skipping, replaying memory")
-            if memory is not None:
+        if existing is not None:
+            # Replay the cycles already on disk into memory BEFORE deciding: a
+            # complete session skips; a partial one continues from its last cycle.
+            # Either way the warm arm's bans cover exactly the trained cycles.
+            if memory is not None and existing.cycles:
                 _replay_memory(existing, memory)
-            sessions.append(existing)
-            continue
-
-        sess = Session(
-            map=str(ref.path),
-            provider=getattr(provider, "name", "mock"),
-            round_budget=round_budget,
-            instructions=f"experiment session {ref.index} of {total}: map '{ref.slug}'",
-        )
+            if _session_complete(existing, budget):
+                print(f"[experiment] resume: {ref.slug} already complete "
+                      f"({len(existing.cycles)} cycle(s)) — skipping")
+                sessions.append(existing)
+                continue
+            if existing.cycles:
+                print(f"[experiment] resume: {ref.slug} continuing from cycle "
+                      f"{len(existing.cycles) + 1} ({len(existing.cycles)} on disk)")
+            sess = existing
+        else:
+            sess = Session(
+                map=str(ref.path),
+                provider=getattr(provider, "name", "mock"),
+                round_budget=round_budget,
+                instructions=f"experiment session {ref.index} of {total}: map '{ref.slug}'",
+            )
         auto_session(sess, provider, sess_path, budget=budget, trace_dir=trace_dir,
                      dump_transcript=dump_transcript, memory=memory)
         sessions.append(sess)
@@ -119,10 +128,10 @@ def _replay_memory(session: Session, memory: Any) -> None:
     """Re-feed each cycle's feedback into ``memory`` in order.
 
     Reconstructs the warm arm's accumulated bans from a resumed session so the
-    skip in :func:`run_experiment` is memory-equivalent to having just trained.
-    Uses :meth:`Session.last_feedback`-style reconstruction per cycle.
+    skip/continue in :func:`run_experiment` is memory-equivalent to having just
+    trained. Uses :meth:`Session.last_feedback`-style reconstruction per cycle.
     """
-    from pecei.infra import Feedback
+    from pecei.llm.protocol import Feedback
     for cycle in session.cycles:
         fb = Feedback(
             stop_reason=cycle.stop_reason,
