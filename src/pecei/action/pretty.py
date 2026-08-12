@@ -70,6 +70,10 @@ def _expr(e) -> str:
     if isinstance(e, Compare):
         return f"{_expr(e.left)} {e.op} {_expr(e.right)}"
     if isinstance(e, BoolOp):
+        # The author (LLM) occasionally emits a malformed BoolOp with no
+        # operands; pretty-printing must never crash the run on bad input.
+        if not e.operands:
+            return "?"
         if e.op == "not":
             return f"not {_expr(e.operands[0])}"
         joiner = " and " if e.op == "and" else " or "
