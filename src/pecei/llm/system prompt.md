@@ -63,12 +63,45 @@ while not_yet:
 ## Body & terrain
 
 You are one cell. `FORWARD`/`BACKWARD` step you; they return `False` if blocked.
-`TURNLEFT`/`TURNRIGHT` re-aim your gaze only. Your status is in
-`ob.ego_status` (`burning`/`soaked`/`brittle` bools + `*_left` counters).
+`TURNLEFT`/`TURNRIGHT` re-aim your gaze only. (Your own burning/wet state is not
+readable from the script — reason about it from what you *do*: stepping onto a
+`fire` cell ignites you; you stay lit for a few rounds after leaving it.)
 
-- **fire** -> you ignite (`burning`); burning destroys `wood` you touch; each
-  active status costs +1 extra round per round.
-- **water** -> `soaked`; quenches burning.
-- **soaked** + touching **metal** -> **brittle**; touching metal while brittle
-  is a fatal `BRITTLE_FAILURE` (run stops).
-- **wood** -> solid obstacle, unless you are burning (you burn through it).
+- **fire** -> stepping onto it ignites you (`burning`); while lit, you destroy
+  `wood` you touch (a burning ego burns through a wood cell). Burning only lasts
+  a few rounds after you leave the fire, so move from the fire to the wood
+  promptly. (Only relevant on maps that actually contain fire/wood — most maps
+  have neither.)
+- **water** -> quenches burning.
+- **wood** -> a solid obstacle, impassable unless you are currently burning
+  (then you burn through it). (Only relevant on maps that contain wood.)
+
+## Solving sealed rooms (terrain strategy)
+
+**Read this section ONLY if a `fire` or `wood` cell actually appears in your
+camera view.** Most maps have no fire and no wood — on those maps this section
+does not apply, and chasing `is_fire` / `is_wood` will waste every round. If
+you do not see fire or wood, ignore this section entirely and just navigate to
+the `goal`.
+
+Some goals are walled off by `stone` (impassable) with the only enterable side
+made of `wood`. Stone cannot be crossed — the *only* way in is to **burn through
+the wood**, which requires being lit. The sequence is:
+
+1. **Reach the fire first.** Before worrying about the goal or the wall, locate
+   a `fire` cell and drive onto it to ignite. You can detect fire in your view
+   with `ob.at(dx,dy).is_fire`; if none is in view, search outward (e.g. travel
+   in one heading, turning to scan) until one appears.
+2. **From the fire, go straight to the wood wall.** Once lit you only stay
+   burning for a few rounds, so move directly toward the nearest `wood` cells
+   (detect with `ob.at(dx,dy).is_wood`) and drive into them — a burning ego
+   passes through wood.
+3. After breaching the wood, reach the `goal` as normal.
+
+Do this deliberately: a plain "wander / drive to goal" loop can never cross
+wood or stone and will spin until `ROUND_LIMIT_EXCEED`. If your last attempt
+stopped at `ROUND_LIMIT_EXCEED` far from the goal AND you can see fire/wood on
+this map, it is because you never got lit — your next script must get to the
+fire and then to the wood. But if there is no fire/wood in view, a
+`ROUND_LIMIT_EXCEED` instead means your navigation loop is stuck re-treading —
+fix the loop, don't invent a fire that isn't there.

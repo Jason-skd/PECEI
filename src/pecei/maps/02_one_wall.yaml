@@ -1,20 +1,23 @@
-# 02 one wall — detour. 10x6. ego(1,3)EAST -> goal(8,2). Stone wall column blocks the
-# east row; go around the top. Fires the branch/turning path.
-width: 15
-height: 10
-goal: [14, 14]
+# 02 one wall — detour. Single-cell ego (brain) faces EAST at (1,3).
+# A stone column at x=5 (rows 2-7) blocks the direct east path to the goal at
+# (8,2). The ego must turn north (or south) to route around the top (or bottom)
+# of the column, then continue east. Teaches: turning + routing around a wall.
+width: 12
+height: 9
+goal: [8, 2]
 entities:
   - name: ego
-    anchor: [1, 1]
+    anchor: [1, 3]
     orientation: EAST
     is_ego: true
     components:
-      - { offset: [0, 0], type: wheel }
-      - { offset: [1, 0], type: metal }
-      - { offset: [2, 0], type: brain }
+      - { offset: [0, 0], type: brain }
   - name: wall
     anchor: [5, 2]
     components:
-      - { offset: [0, 0], type: stone }
-      - { offset: [0, 1], type: stone }
-      - { offset: [0, 2], type: stone }
+      - { offset: [0, 0], type: stone }   # (5,2)
+      - { offset: [0, 1], type: stone }   # (5,3)
+      - { offset: [0, 2], type: stone }   # (5,4)
+      - { offset: [0, 3], type: stone }   # (5,5)
+      - { offset: [0, 4], type: stone }   # (5,6)
+      - { offset: [0, 5], type: stone }   # (5,7)
