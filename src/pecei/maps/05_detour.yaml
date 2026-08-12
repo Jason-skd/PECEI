@@ -1,0 +1,22 @@
+# 05 detour — single low wall, close goal. 9x7. Single-cell ego (brain) faces
+# EAST at (1,3). Goal at (7,3). A short stone block at (4,2)-(4,4) sits on the
+# straight path. The goal is only ~6 east, inside the FOV cone from the start,
+# so the ego sees it immediately; it just has to step around a 3-cell block.
+# Easier than 02_one_wall (goal visible, wall shorter). Teaches: sidestep a
+# single visible obstacle on an otherwise-clear straight run.
+width: 9
+height: 7
+goal: [7, 3]
+entities:
+  - name: ego
+    anchor: [1, 3]
+    orientation: EAST
+    is_ego: true
+    components:
+      - { offset: [0, 0], type: brain }
+  - name: block
+    anchor: [4, 2]
+    components:
+      - { offset: [0, 0], type: stone }   # (4,2)
+      - { offset: [0, 1], type: stone }   # (4,3)
+      - { offset: [0, 2], type: stone }   # (4,4)

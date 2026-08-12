@@ -1,0 +1,55 @@
+# 07 fire key — easy burn-through. 9x7. Single-cell ego (brain) faces EAST at
+# (1,3). The goal at (7,4) is sealed behind a WOOD door at (6,4) on row 4; stone
+# walls above (row 3, cols 6-8) and below (row 5, cols 6-8) plus behind (8,4)
+# seal the goal corridor so the wood is the ONLY way in. A fire cell at (4,4)
+# sits on row 4, two cells west of the door, with (5,4) empty between them.
+#
+# The ego starts one row NORTH of the fire/door line, so naive-straight east
+# along row 3 hits the stone cap at (6,3) and stalls. The intended play: turn
+# south onto row 4, run east onto the fire (ignite), keep going east — (5,4) is
+# empty, then (6,4) is the wood door, which the burning ego burns through
+# (fire arrival leaves burning_left=2, exactly enough to burn a door 2 moves
+# away; turns are free), then (7,4) is the goal.
+#
+# Easier than 04_fire_wood: the fire is on the same straight line as the door
+# and goal (no hunting for a flame off in a corner), and the door is a single
+# cell. Teaches: fire+wood are a key/door pair — divert one row, ignite, commit.
+width: 9
+height: 7
+goal: [7, 4]
+entities:
+  - name: ego
+    anchor: [1, 3]
+    orientation: EAST
+    is_ego: true
+    components:
+      - { offset: [0, 0], type: brain }
+  # fire on row 4, two cells west of the wood door ((5,4) empty between)
+  - name: fire1
+    anchor: [4, 4]
+    components:
+      - { offset: [0, 0], type: fire }    # (4,4)
+  # the wood DOOR on row 4
+  - name: door
+    anchor: [6, 4]
+    components:
+      - { offset: [0, 0], type: wood }    # (6,4)
+  # stone cap that blocks naive-straight east along the ego's start row (row 3)
+  - name: cap_top
+    anchor: [6, 3]
+    components:
+      - { offset: [0, 0], type: stone }   # (6,3)
+      - { offset: [1, 0], type: stone }   # (7,3)
+      - { offset: [2, 0], type: stone }   # (8,3)
+  # stone below the goal corridor (row 5, cols 6-8)
+  - name: cap_bot
+    anchor: [6, 5]
+    components:
+      - { offset: [0, 0], type: stone }   # (6,5)
+      - { offset: [1, 0], type: stone }   # (7,5)
+      - { offset: [2, 0], type: stone }   # (8,5)
+  # behind the goal (col 8, row 4) so the ego stops on the goal cell
+  - name: back
+    anchor: [8, 4]
+    components:
+      - { offset: [0, 0], type: stone }   # (8,4)

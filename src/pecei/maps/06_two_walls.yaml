@@ -1,0 +1,38 @@
+# 06 two walls — staggered pair, single zig-zag. 11x8. Single-cell ego (brain)
+# faces EAST at (1,4). Goal at (9,4). Wall A at x=4 (rows 0-5, gap at bottom
+# rows 6-7) and wall B at x=7 (rows 2-7, gap at top rows 0-1). The ego must dip
+# south through A's gap, then climb north through B's gap, then run east to the
+# goal. One S-turn only (03_maze has three). No fire/wood. Teaches: reading gap
+# position and committing to one detour, then the reverse.
+width: 11
+height: 8
+goal: [9, 4]
+entities:
+  - name: ego
+    anchor: [1, 4]
+    orientation: EAST
+    is_ego: true
+    components:
+      - { offset: [0, 0], type: brain }
+  # wall A at x=4 (rows 0-5; gap at rows 6-7, the bottom)
+  - name: wallA
+    anchor: [4, 0]
+    components:
+      - { offset: [0, 0], type: stone }   # (4,0)
+      - { offset: [0, 1], type: stone }   # (4,1)
+      - { offset: [0, 2], type: stone }   # (4,2)
+      - { offset: [0, 3], type: stone }   # (4,3)
+      - { offset: [0, 4], type: stone }   # (4,4)
+      - { offset: [0, 5], type: stone }   # (4,5)
+      # gap at (4,6),(4,7)
+  # wall B at x=7 (rows 2-7; gap at rows 0-1, the top)
+  - name: wallB
+    anchor: [7, 2]
+    components:
+      - { offset: [0, 0], type: stone }   # (7,2)
+      - { offset: [0, 1], type: stone }   # (7,3)
+      - { offset: [0, 2], type: stone }   # (7,4)
+      - { offset: [0, 3], type: stone }   # (7,5)
+      - { offset: [0, 4], type: stone }   # (7,6)
+      - { offset: [0, 5], type: stone }   # (7,7)
+      # gap at (7,0),(7,1)

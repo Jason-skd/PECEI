@@ -1,7 +1,7 @@
-"""Map validity tests: the four game maps are solvable and non-trivial.
+"""Map validity tests: the game maps are solvable and non-trivial.
 
 A state-space search over (anchor, orientation, burning_left, remaining-wood)
-proves each map is winnable — including the fire+wood map, whose solution
+proves each map is winnable — including the fire+wood maps, whose solution
 requires the ego to ignite and burn through a wood wall (terrain is *not*
 static, so the state must carry burning + the live wood set). A naive
 "always go straight" probe must fail on the non-baseline maps (02+). If a map
@@ -20,6 +20,16 @@ CORRIDOR = MAPS / "01_corridor.yaml"
 ONE_WALL = MAPS / "02_one_wall.yaml"
 MAZE = MAPS / "03_maze.yaml"
 FIRE_WOOD = MAPS / "04_fire_wood.yaml"
+DETOUR = MAPS / "05_detour.yaml"
+TWO_WALLS = MAPS / "06_two_walls.yaml"
+FIRE_KEY = MAPS / "07_fire_key.yaml"
+
+# Baseline + the original three hard maps.
+ALL_MAPS = (CORRIDOR, ONE_WALL, MAZE, FIRE_WOOD)
+# Medium-difficulty maps added for the warm-vs-cold gap (between corridor-trivial
+# and maze/fire_wood-unsolved). Same invariants: solvable, non-trivial.
+MEDIUM_MAPS = (DETOUR, TWO_WALLS, FIRE_KEY)
+EVERY_MAP = ALL_MAPS + MEDIUM_MAPS
 
 
 def _at_goal(world, eid):
@@ -115,27 +125,27 @@ def _naive_straight(path):
     return _at_goal(w, eid)
 
 
-def test_all_four_maps_are_solvable():
-    for m in (CORRIDOR, ONE_WALL, MAZE, FIRE_WOOD):
+def test_all_maps_are_solvable():
+    for m in EVERY_MAP:
         sol = _solve(str(m))
         assert sol is not None, f"{m.name} should be solvable"
 
 
 def test_harder_maps_are_not_trivially_solvable():
     assert _naive_straight(str(CORRIDOR)) is True      # baseline: straight east works
-    for m in (ONE_WALL, MAZE, FIRE_WOOD):
+    for m in (*ALL_MAPS[1:], *MEDIUM_MAPS):
         assert _naive_straight(str(m)) is False, f"{m.name} should block naive-straight"
 
 
 def test_maps_have_ego_and_goal():
-    for m in (CORRIDOR, ONE_WALL, MAZE, FIRE_WOOD):
+    for m in EVERY_MAP:
         w = load_world(str(m))
         assert w.ego is not None and w.goal is not None
 
 
 def test_maps_use_single_cell_body():
-    """All four game maps use the single-cell ego (brain only)."""
-    for m in (CORRIDOR, ONE_WALL, MAZE, FIRE_WOOD):
+    """All game maps use the single-cell ego (brain only)."""
+    for m in EVERY_MAP:
         w = load_world(str(m))
         ctypes = {c.ctype for c in w.ego.components.values()}
         assert ctypes == {ComponentType.BRAIN}, f"{m.name} ego should be brain-only, got {ctypes}"
