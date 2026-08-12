@@ -6,8 +6,8 @@ only rendered when the caller explicitly asks for it (e.g. ``pecei compare
 --plot``).
 
 Palette: the two arms are a 2-slot categorical encoding. The validated
-CVD-safe pair is warm = blue ``#2a78d6`` (the trained prototype) and cold =
-orange ``#eb6834`` (the from-scratch baseline) — blue/orange is the canonical
+CVD-safe pair is warm = orange ``#eb6834`` (the trained prototype) and cold =
+blue ``#2a78d6`` (the from-scratch baseline) — orange/blue is the canonical
 colorblind-distinguishable pair, and these specific hexes clear the adjacent-
 pair CVD separation check.
 """
@@ -17,9 +17,9 @@ from pathlib import Path
 
 from pecei.compare import ARM_COLD, ARM_WARM, ComparisonResult
 
-# Validated CVD-safe 2-slot categorical palette (blue/orange).
-WARM_COLOR = "#2a78d6"
-COLD_COLOR = "#eb6834"
+# Validated CVD-safe 2-slot categorical palette (orange/blue).
+WARM_COLOR = "#eb6834"
+COLD_COLOR = "#2a78d6"
 
 
 def plot_comparison(
