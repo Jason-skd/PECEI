@@ -73,6 +73,9 @@ def main(argv: list[str] | None = None) -> int:
                        help="use deterministic (rule-based) memory compression instead of an LLM")
     p_cmp.add_argument("--plot", action="store_true", help="also render a grouped bar chart PNG")
     p_cmp.add_argument("--no-transcript", action="store_true", help="don't auto-write transcripts per session")
+    p_cmp.add_argument("--resume", action="store_true",
+                       help="skip sessions already at budget/SUCCESS (replay their memory); "
+                            "restart a long compare after a crash without redoing finished maps")
 
     p_rep = sub.add_parser("replay", help="replay a trace (one epoch) or a session (pick an epoch)")
     p_rep.add_argument("map", help="path to the map that produced the trace(s)")
@@ -190,6 +193,7 @@ def _compare(args) -> int:
         budget=args.budget, round_budget=args.round_budget,
         out_dir=args.out, memory_llm=memory_llm,
         dump_transcript=not args.no_transcript,
+        resume=args.resume,
     )
     _print_comparison_summary(result)
 

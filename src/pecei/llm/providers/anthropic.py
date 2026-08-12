@@ -23,12 +23,17 @@ class AnthropicProvider:
         model: str = DEFAULT_MODEL,
         max_tokens: int = 2048,
         base_url: str | None = None,
+        timeout: float = 120.0,
+        max_retries: int = 4,
     ) -> None:
         import anthropic
 
         # api_key=None -> SDK resolves env var / `ant auth login` profile.
         # base_url=None -> SDK default; set to point at a relay / self-hosted endpoint.
-        kw = {"api_key": api_key}
+        # timeout/max_retries matter for long unattended runs: the SDK default
+        # timeout can let a socket hang indefinitely when the host sleeps mid-
+        # request, which silently froze a multi-hour compare run at 0% CPU.
+        kw = {"api_key": api_key, "timeout": timeout, "max_retries": max_retries}
         if base_url:
             kw["base_url"] = base_url
         self._client = anthropic.Anthropic(**kw)

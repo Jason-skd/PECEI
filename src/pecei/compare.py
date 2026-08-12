@@ -154,6 +154,7 @@ def run_compare(
     out_dir: str | Path = "compare",
     memory_llm: Callable[[str], str] | None = None,
     dump_transcript: bool = False,
+    resume: bool = False,
 ) -> ComparisonResult:
     """Run the warm-vs-cold comparison and persist metrics + sessions.
 
@@ -194,7 +195,7 @@ def run_compare(
         run_experiment(
             train_dir, provider,
             out_dir=out / "warm_train", budget=budget, round_budget=round_budget,
-            dump_transcript=dump_transcript, memory=warm_memory,
+            dump_transcript=dump_transcript, memory=warm_memory, resume=resume,
         )
     else:
         logger.warning("train_dir %s has no maps; warm arm gets no training", train_dir)
@@ -203,7 +204,7 @@ def run_compare(
     warm_sessions = run_experiment(
         test_dir, provider,
         out_dir=out / "warm", budget=budget, round_budget=round_budget,
-        dump_transcript=dump_transcript, memory=warm_memory,
+        dump_transcript=dump_transcript, memory=warm_memory, resume=resume,
     )
     warm_metrics = _metrics_from_sessions(warm_sessions, test_refs, ARM_WARM, out / "warm")
 
@@ -212,7 +213,7 @@ def run_compare(
     cold_sessions = run_experiment(
         test_dir, provider,
         out_dir=out / "cold", budget=budget, round_budget=round_budget,
-        dump_transcript=dump_transcript, memory=None,
+        dump_transcript=dump_transcript, memory=None, resume=resume,
     )
     cold_metrics = _metrics_from_sessions(cold_sessions, test_refs, ARM_COLD, out / "cold")
 

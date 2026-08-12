@@ -17,6 +17,7 @@ import re
 from pathlib import Path
 from typing import Any, NamedTuple
 
+from pecei.infra import Result
 from pecei.llm.protocol import LLMProvider
 from pecei.session import Session, auto_session
 
@@ -54,12 +55,19 @@ def run_experiment(
     round_budget: int = 100,
     dump_transcript: bool = True,
     memory: Any | None = None,
+    resume: bool = False,
 ) -> list[Session]:
     """Train each map in ``directory`` as its own session, in order. Returns the
     list of Sessions (each saved to ``out_dir/<slug>.session.json``).
 
     ``memory``: an optional shared ``MemoryEvolution`` threaded through every
     session's cycles, so learned bans accumulate across the maps trained here.
+
+    ``resume``: when True, a session JSON that already reached ``budget`` cycles
+    (or SUCCESS) is loaded instead of re-run, and its per-cycle feedback is
+    replayed into ``memory`` so the warm arm's accumulated bans are reconstructed
+    exactly as if the session had just trained. Lets a long compare run restart
+    after a crash / sleep without redoing finished maps.
     """
     maps = parse_experiment(directory)
     total = len(maps)
@@ -71,14 +79,24 @@ def run_experiment(
     sessions: list[Session] = []
     for ref in maps:
         print(f"\n=== session {ref.index}/{total}: {ref.slug} ({ref.path.name}) ===")
+        sess_path = out / f"{ref.slug}.session.json"
+        trace_dir = out / f"{ref.slug}.traces"
+
+        existing = Session.load(sess_path) if resume and sess_path.exists() else None
+        if existing is not None and _session_complete(existing, budget):
+            print(f"[experiment] resume: {ref.slug} already complete "
+                  f"({len(existing.cycles)} cycle(s)) — skipping, replaying memory")
+            if memory is not None:
+                _replay_memory(existing, memory)
+            sessions.append(existing)
+            continue
+
         sess = Session(
             map=str(ref.path),
             provider=getattr(provider, "name", "mock"),
             round_budget=round_budget,
             instructions=f"experiment session {ref.index} of {total}: map '{ref.slug}'",
         )
-        sess_path = out / f"{ref.slug}.session.json"
-        trace_dir = out / f"{ref.slug}.traces"
         auto_session(sess, provider, sess_path, budget=budget, trace_dir=trace_dir,
                      dump_transcript=dump_transcript, memory=memory)
         sessions.append(sess)
@@ -86,3 +104,32 @@ def run_experiment(
     solved = sum(1 for s in sessions if s.success_count > 0)
     print(f"\n[experiment] done: {solved}/{total} maps solved")
     return sessions
+
+
+def _session_complete(session: Session, budget: int) -> bool:
+    """A session is 'complete' if it hit SUCCESS or exhausted the cycle budget."""
+    if not session.cycles:
+        return False
+    if session.cycles[-1].stop_reason is Result.SUCCESS:
+        return True
+    return len(session.cycles) >= budget
+
+
+def _replay_memory(session: Session, memory: Any) -> None:
+    """Re-feed each cycle's feedback into ``memory`` in order.
+
+    Reconstructs the warm arm's accumulated bans from a resumed session so the
+    skip in :func:`run_experiment` is memory-equivalent to having just trained.
+    Uses :meth:`Session.last_feedback`-style reconstruction per cycle.
+    """
+    from pecei.infra import Feedback
+    for cycle in session.cycles:
+        fb = Feedback(
+            stop_reason=cycle.stop_reason,
+            rounds_used=cycle.rounds,
+            script=cycle.script,
+            yielded=[],
+            failure_snapshot=cycle.failure_snapshot,
+            compile_error=cycle.compile_error,
+        )
+        memory.remember(fb)
