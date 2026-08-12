@@ -113,8 +113,11 @@ Metrics per arm: `epochs_to_success` (cycles up to & including first SUCCESS), `
 - `02_one_wall` — a stone column forces a detour (turning + branching).
 - `03_maze` — three staggered stone walls with alternating gaps; zig-zag + gap selection, blind exploration.
 - `04_fire_wood` — the goal is sealed in a stone room whose only enterable side is a wood wall; the ego must first touch fire to ignite, then burn through the wood (terrain interaction).
+- `05_detour` — a single 3-cell stone block on a straight run, goal in view; the easiest non-trivial detour.
+- `06_two_walls` — two staggered walls, one S-turn each way (a single-zigzag `03_maze`).
+- `07_fire_key` — fire and a wood door share one straight line one row off the start; ignite, then commit east to burn through.
 
-All four are BFS-proven solvable, and naive "drive straight" fails on 02–04, so the author can't read the answer off the start.
+All seven are BFS-proven solvable, and naive "drive straight" fails on 02–07, so the author can't read the answer off the start. 05–07 are the medium-difficulty set added so a cold-start arm can plausibly solve them within budget while a warm-start arm solves them sooner (they bridge the gap between corridor-trivial and maze/fire_wood-unsolved).
 
 ### Replay controls
 
