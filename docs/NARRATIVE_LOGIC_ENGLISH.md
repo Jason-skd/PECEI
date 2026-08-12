@@ -93,11 +93,11 @@ yet another general mind.
 2. We use **epochs and rounds consumed** to show the prototype is genuinely learning; we do not have
    a real benchmark. To our knowledge, the field does not yet have one either — and we welcome the
    professors' guidance.
-3. **A tension worth naming.** We did *not* ground our research in one concrete domain (e.g.,
-   "AIGI for fire rescue"), precisely because we want to prove AIGI's *dual* property — universality
-   *and* specialization. Yet we *did* take one concrete scenario (AIGI rescuing a human) as the base
-   object of study — a reasonable embodiment of the research setting. This, however, may not be
-   enough to establish AIGI's *absolute* universality.
+3. **Our "backend-agnostic" claim is unverified.** We ran only one backend — an LLM API — and never
+   swapped in RL (reinforcement learning), supervised learning, or other methods as a controlled
+   comparison to show that this learning paradigm is genuinely independent of the backend.
+   Constrained by the 13 days of summer camp and limited compute, we could not run such comparative
+   experiments.
 
 ### The exciting ambitions of this prototype (future outlook)
 

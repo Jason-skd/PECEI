@@ -93,7 +93,7 @@ We are honest about limits. Our grid world is abstract — it lacks detail, and 
 
 We measure learning in **epochs** and **rounds**, because — to our knowledge — there is no real benchmark yet. We welcome the professors' guidance here.
 
-And one honest tension: we did not study **one** domain, like "AIGI for fire rescue," because we wanted to prove AIGI is **both** universal **and** specialized. We used one concrete rescue scene to stay grounded — but that alone may not prove **absolute** universality.
+And one honest gap: we call this paradigm **backend-agnostic** — but we only tested **one** backend, the LLM API. We never swapped in reinforcement learning, or supervised learning, to prove the paradigm truly holds across backends. In thirteen days, on limited compute, we could **not** run those controlled experiments.
 
 Looking forward. Our inner loop works. Add the middle loop — shared memory, reusable skills — and we move toward **AGEI**, a general embodied intelligence. Add the outer loop — the agent **regenerating its own body** — and we reach the ultimate vision: **AIGI**. The day AI creates another AI — an idea Karl Sims first imagined thirty years ago, with creatures that grew their own bodies and brains.
 
@@ -107,4 +107,4 @@ Looking forward. Our inner loop works. Add the middle loop — shared memory, re
 - **Pace:** if you tend to speak fast when nervous, the `[≈M:SS]` markers give ~10 s of slack per slide — breathe there.
 - **Hardest line to say:** "it specializes **without losing** its power to specialize again" — practice it three times slowly; it is the talk's punchline.
 - **Slide 6 ("it failed")** — say it with a small smile. The failure *is* the evidence; let the audience feel the twist.
-- If running long, the safest cut is one sentence in the Discussion's "honest tension" paragraph.
+- If running long, the safest cut is one sentence in the Discussion's "honest gap" paragraph (the backend-agnostic limitation).
